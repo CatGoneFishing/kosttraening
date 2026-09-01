@@ -1,6 +1,6 @@
-// Simpel offline-cache, så appen kan åbnes uden internet efter første besøg.
-// Bemærk: søgning og stregkodescanning kræver stadig internet (de henter data fra Open Food Facts).
-const CACHE_NAME = 'naeringsdagbog-v1';
+// Offline-cache med "netværk først"-strategi: henter altid den nyeste version, når du har forbindelse,
+// og falder kun tilbage til den gemte udgave, hvis du er offline.
+const CACHE_NAME = 'naeringsdagbog-v2';
 const APP_SHELL = [
   './',
   './index.html',
@@ -26,15 +26,13 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Kun cache egne filer (samme origin) - eksterne API-kald (Open Food Facts, cdnjs) går altid til nettet.
+  // Kun egne filer (samme origin) - eksterne API-kald (Open Food Facts, cdnjs) rammer altid nettet direkte.
   if (event.request.url.indexOf(self.location.origin) !== 0) return;
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      return cached || fetch(event.request).then((response) => {
-        const copy = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
-        return response;
-      }).catch(() => cached);
-    })
+    fetch(event.request).then((response) => {
+      const copy = response.clone();
+      caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+      return response;
+    }).catch(() => caches.match(event.request))
   );
 });
