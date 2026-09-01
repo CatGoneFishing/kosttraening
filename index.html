@@ -1,0 +1,2500 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Næringsdagbog</title>
+<meta name="description" content="Personlig kost-, vægt- og træningsdagbog">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#16231C">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Næringsdagbog">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon-192.png">
+<style>
+  html, body { margin:0; padding:0; background:#16231C; }
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+<script>
+  // Lokal erstatning for Claude-artifactens window.storage, baseret på browserens localStorage.
+  // Gemmer alt under samme oprindelse (din GitHub Pages-adresse), så data ligger på telefonen/i browseren.
+  (function () {
+    const PREFIX = 'naeringsdagbog__';
+    window.storage = {
+      async get(key) {
+        try {
+          const raw = localStorage.getItem(PREFIX + key);
+          if (raw === null) return null;
+          return { key, value: raw, shared: false };
+        } catch (e) { return null; }
+      },
+      async set(key, value) {
+        try {
+          localStorage.setItem(PREFIX + key, value);
+          return { key, value, shared: false };
+        } catch (e) { return null; }
+      },
+      async delete(key) {
+        try {
+          const existed = localStorage.getItem(PREFIX + key) !== null;
+          localStorage.removeItem(PREFIX + key);
+          return { key, deleted: existed, shared: false };
+        } catch (e) { return null; }
+      },
+      async list(prefix) {
+        try {
+          const p = PREFIX + (prefix || '');
+          const keys = [];
+          for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            if (k && k.indexOf(p) === 0) keys.push(k.slice(PREFIX.length));
+          }
+          return { keys, prefix, shared: false };
+        } catch (e) { return null; }
+      }
+    };
+  })();
+</script>
+</head>
+<body>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+  #nd-app * { box-sizing: border-box; }
+  #nd-app {
+    --ink: #16231C;
+    --surface: #1F2E24;
+    --surface-2: #263A2C;
+    --line: #33473A;
+    --text-hi: #F4F1E6;
+    --text-mid: #B9C7B4;
+    --text-lo: #7C9182;
+    --lime: #D7F23C;
+    --lime-dim: #A9BF3A;
+    --sky: #6FA0C7;
+    --plum: #A387C9;
+    --coral: #FF8266;
+    --sand: #E8C15F;
+    --sage: #6FB07E;
+    --red: #E8695A;
+    font-family: 'Inter', sans-serif;
+    background: var(--ink);
+    color: var(--text-hi);
+    max-width: 420px;
+    margin: 0 auto;
+    border-radius: 20px;
+    overflow: hidden;
+    position: relative;
+    min-height: 100vh;
+  }
+  #nd-app .fr { font-family: 'Fraunces', serif; }
+  #nd-app .mono { font-family: 'IBM Plex Mono', monospace; }
+
+  #nd-app .screen { display: none; padding: 20px 18px 90px; }
+  #nd-app .screen.active { display: block; }
+
+  #nd-app .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; gap: 10px; }
+  #nd-app .daynav { background: none; border: 1px solid var(--line); color: var(--text-mid); border-radius: 8px; width: 30px; height: 30px; font-size: 17px; cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+  #nd-app .daynav:disabled { opacity: .35; cursor: default; }
+  #nd-app #nd-day-picker { width: auto; margin: 0; padding: 6px 6px; font-size: 11px; min-width: 0; }
+  #nd-app .topbar .date { font-size: 13px; color: var(--text-lo); text-transform: capitalize; }
+  #nd-app .topbar .title { font-size: 22px; font-weight: 600; }
+
+  #nd-app .ring-wrap { display: flex; justify-content: center; margin: 6px 0 20px; }
+  #nd-app .ring-center { fill: none; }
+  #nd-app .ring-num { font-size: 30px; font-weight: 600; fill: var(--text-hi); font-family: 'Fraunces', serif; }
+  #nd-app .ring-lbl { font-size: 10px; fill: var(--text-lo); letter-spacing: .04em; }
+
+  #nd-app .macrobar-row { display: flex; justify-content: space-between; margin-bottom: 14px; gap: 10px; }
+  #nd-app .macrobar { flex: 1; }
+  #nd-app .macrobar .top { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-mid); margin-bottom: 5px; }
+  #nd-app .macrobar .track { height: 5px; border-radius: 3px; background: var(--surface-2); overflow: hidden; }
+  #nd-app .macrobar .fill { height: 100%; border-radius: 3px; }
+
+  #nd-app .section-lbl { font-size: 12px; color: var(--text-lo); letter-spacing: .05em; margin: 20px 0 8px; text-transform: uppercase; display: flex; justify-content: space-between; }
+  #nd-app .section-lbl .kc { color: var(--text-mid); text-transform: none; letter-spacing: 0; }
+
+  #nd-app .entry { display: flex; justify-content: space-between; align-items: center; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-bottom: 8px; cursor: pointer; }
+  #nd-app .entry .name { font-size: 14px; font-weight: 500; }
+  #nd-app .entry .sub { font-size: 12px; color: var(--text-lo); margin-top: 2px; }
+  #nd-app .entry .kcal { font-size: 14px; font-weight: 500; color: var(--lime); }
+  #nd-app .entry .del { background: none; border: none; color: var(--text-lo); font-size: 18px; cursor: pointer; padding: 0 0 0 12px; }
+  #nd-app .empty { text-align: center; color: var(--text-lo); font-size: 13px; padding: 30px 10px; }
+
+  #nd-app .fab-bar { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 420px; height: 0; pointer-events: none; z-index: 5; }
+  #nd-app .fab { position: absolute; right: 18px; bottom: 84px; width: 54px; height: 54px; border-radius: 50%; background: var(--lime); color: var(--ink); border: none; font-size: 26px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; pointer-events: auto; }
+  #nd-app .fab-left { right: auto; left: 18px; background: var(--sage); }
+
+  #nd-app .nav { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 420px; display: flex; background: var(--surface); border-top: 1px solid var(--line); padding: 9px 0 11px; z-index: 6; }
+  #nd-app .nav button { flex: 1; background: none; border: none; color: var(--text-lo); font-size: 10.5px; font-family: 'Inter'; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 0 2px; }
+  #nd-app .nav button.active { color: var(--lime); }
+  #nd-app .nav .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: 0; }
+  #nd-app .nav button.active .dot { opacity: 1; }
+
+  #nd-app input[type=text], #nd-app input[type=number], #nd-app input[type=date], #nd-app select, #nd-app textarea { width: 100%; background: var(--surface); border: 1px solid var(--line); color: var(--text-hi); border-radius: 10px; padding: 11px 13px; font-size: 14px; font-family: 'Inter'; margin-bottom: 10px; }
+  #nd-app textarea { resize: vertical; }
+  #nd-app .chip { background: var(--surface); border: 1px solid var(--line); color: var(--text-mid); padding: 7px 13px; border-radius: 16px; font-size: 12px; cursor: pointer; font-family: 'Inter'; }
+  #nd-app .chip.active { background: var(--lime); color: var(--ink); border-color: var(--lime); font-weight: 600; }
+  #nd-app .tagpill { display: inline-block; background: var(--surface-2); color: var(--text-mid); font-size: 11px; padding: 3px 9px; border-radius: 10px; margin: 0 5px 5px 0; }
+  #nd-app input::placeholder { color: var(--text-lo); }
+  #nd-app label.fieldlbl { font-size: 12px; color: var(--text-mid); display: block; margin: 12px 0 6px; }
+  #nd-app label.chk { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-mid); margin: 10px 0; }
+  #nd-app label.chk input { width: auto; margin: 0; }
+
+  #nd-app .btn { display: block; width: 100%; text-align: center; background: var(--lime); color: var(--ink); border: none; border-radius: 10px; padding: 13px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: 'Inter'; }
+  #nd-app .btn.ghost { background: none; border: 1px solid var(--line); color: var(--text-hi); }
+  #nd-app .btn.danger { background: none; border: 1px solid var(--red); color: var(--red); }
+  #nd-app .btnrow { display: flex; gap: 8px; margin-top: 10px; }
+  #nd-app .btnrow .btn { flex: 1; }
+
+  #nd-app .modal-back { position: fixed; inset: 0; background: rgba(10,15,11,.65); display: flex; align-items: flex-end; z-index: 40; }
+  #nd-app .modal { background: var(--ink); width: 100%; max-width: 420px; margin: 0 auto; border-radius: 20px 20px 0 0; padding: 20px 18px 26px; max-height: 82vh; overflow-y: auto; }
+  #nd-app .modal .mhead { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+  #nd-app .modal .mhead .mtitle { font-size: 17px; font-weight: 600; }
+  #nd-app .modal .mclose { background: none; border: none; color: var(--text-lo); font-size: 20px; cursor: pointer; }
+
+  #nd-app .segtabs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+  #nd-app .segtabs button { background: var(--surface); border: 1px solid var(--line); color: var(--text-mid); padding: 9px; border-radius: 10px; font-size: 12.5px; cursor: pointer; font-family: 'Inter'; }
+  #nd-app .segtabs button.active { background: var(--lime); color: var(--ink); border-color: var(--lime); font-weight: 600; }
+
+  #nd-app .prodcard { display: flex; gap: 10px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 11px 12px; margin-bottom: 8px; cursor: pointer; align-items: center; }
+  #nd-app .prodcard .pname { font-size: 13px; font-weight: 500; }
+  #nd-app .prodcard .pbrand { font-size: 11px; color: var(--text-lo); }
+  #nd-app .prodcard .pkcal { margin-left: auto; font-size: 12px; color: var(--lime); white-space: nowrap; }
+  #nd-app .prodcard .favdel { background: none; border: none; color: var(--text-lo); font-size: 17px; cursor: pointer; padding: 0 0 0 8px; }
+
+  #nd-app #nd-scanbox { width: 100%; border-radius: 12px; overflow: hidden; margin-bottom: 12px; background: #000; min-height: 220px; }
+  #nd-app .hint { font-size: 12px; color: var(--text-lo); text-align: center; margin-bottom: 10px; }
+
+  #nd-app .goalgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  #nd-app .statgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 14px 0; }
+  #nd-app .statcard { background: var(--surface); border-radius: 12px; padding: 12px 14px; }
+  #nd-app .statcard .lbl { font-size: 11px; color: var(--text-lo); margin-bottom: 4px; }
+  #nd-app .statcard .val { font-size: 18px; font-weight: 600; font-family: 'IBM Plex Mono', monospace; }
+
+  #nd-app .weightrow { display: flex; justify-content: space-between; align-items: center; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 11px 14px; margin-bottom: 8px; cursor: pointer; }
+  #nd-app .weightrow .wd { font-size: 13px; color: var(--text-mid); }
+  #nd-app .weightrow .wv { font-size: 15px; font-weight: 600; font-family: 'IBM Plex Mono', monospace; color: var(--lime); }
+
+  #nd-app .goalrow { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-bottom: 8px; cursor: pointer; }
+  #nd-app .goalrow .ghead { display: flex; justify-content: space-between; align-items: center; margin-bottom: 7px; gap: 8px; }
+  #nd-app .goalrow .gname { font-size: 14px; font-weight: 500; display: flex; align-items: center; gap: 6px; }
+  #nd-app .goalrow .gstat { font-size: 12px; color: var(--text-mid); font-family: 'IBM Plex Mono', monospace; white-space: nowrap; }
+  #nd-app .goalrow .gtrack { height: 6px; border-radius: 3px; background: var(--surface-2); overflow: hidden; }
+  #nd-app .goalrow .gfill { height: 100%; border-radius: 3px; background: var(--lime); }
+  #nd-app .goalrow.done .gfill { background: var(--sage); }
+  #nd-app .goalrow.done .gstat { color: var(--sage); }
+  #nd-app .gcheck { color: var(--sage); font-size: 13px; }
+  #nd-app .gapbanner { display: none; background: var(--surface); border: 1px solid var(--sand); border-radius: 12px; padding: 14px; margin-bottom: 16px; font-size: 13px; color: var(--text-mid); line-height: 1.4; }
+</style>
+
+<div id="nd-app">
+
+  <div class="screen active" id="nd-screen-today">
+    <div class="topbar">
+      <div>
+        <div class="date" id="nd-date"></div>
+        <div class="title fr" id="nd-day-title">I dag</div>
+      </div>
+      <div style="display:flex; align-items:center; gap:6px;">
+        <button class="daynav" id="nd-day-prev" aria-label="Forrige dag">&lsaquo;</button>
+        <input type="date" id="nd-day-picker">
+        <button class="daynav" id="nd-day-next" aria-label="Næste dag">&rsaquo;</button>
+      </div>
+    </div>
+
+    <div id="nd-gap-banner" class="gapbanner"></div>
+
+    <div id="nd-daynote"></div>
+
+    <label class="chk" id="nd-skipday-label" style="margin:0 0 16px;">
+      <input type="checkbox" id="nd-skipday-checkbox">
+      Jeg logger ikke i dag – tæl ikke dagen med i overblikket
+    </label>
+
+    <div class="ring-wrap">
+      <svg width="190" height="190" viewBox="0 0 190 190">
+        <circle class="ring-center" cx="95" cy="95" r="78" stroke="#263A2C" stroke-width="14"/>
+        <g id="nd-ring-arcs"></g>
+        <text x="95" y="90" text-anchor="middle" class="ring-num" id="nd-ring-kcal">0</text>
+        <text x="95" y="112" text-anchor="middle" class="ring-lbl" id="nd-ring-label">TILBAGE AF 0 KCAL</text>
+      </svg>
+    </div>
+
+    <div class="macrobar-row">
+      <div class="macrobar">
+        <div class="top"><span>Protein</span><span class="mono" id="nd-m-protein">0/0g</span></div>
+        <div class="track"><div class="fill" id="nd-m-protein-fill" style="background:var(--coral); width:0%"></div></div>
+      </div>
+      <div class="macrobar">
+        <div class="top"><span>Kulhydrat</span><span class="mono" id="nd-m-carbs">0/0g</span></div>
+        <div class="track"><div class="fill" id="nd-m-carbs-fill" style="background:var(--sand); width:0%"></div></div>
+      </div>
+      <div class="macrobar">
+        <div class="top"><span>Fedt</span><span class="mono" id="nd-m-fat">0/0g</span></div>
+        <div class="track"><div class="fill" id="nd-m-fat-fill" style="background:var(--sage); width:0%"></div></div>
+      </div>
+    </div>
+
+    <div id="nd-meal-dist"></div>
+
+    <div id="nd-meal-groups"></div>
+
+    <div class="section-lbl" style="margin-top:20px;"><span>Træning</span></div>
+    <div id="nd-exercise-list"></div>
+    <div style="margin-bottom:30px;"></div>
+
+    <div class="fab-bar">
+      <button class="fab fab-left" id="nd-fab-exercise" aria-label="Tilføj træning">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--ink)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="5.5" cy="17.5" r="3.5"/>
+          <circle cx="18.5" cy="17.5" r="3.5"/>
+          <circle cx="15" cy="5" r="1.2" fill="var(--ink)"/>
+          <path d="M12 17.5V14l-3-3 4-3 2 3h2"/>
+        </svg>
+      </button>
+      <button class="fab" id="nd-fab" aria-label="Tilføj vare">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/>
+          <path d="M7 2v20"/>
+          <path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="screen" id="nd-screen-overview">
+    <div class="topbar"><div><div class="date">Statistik</div><div class="title fr">Overblik</div></div></div>
+    <select id="nd-ov-range">
+      <option value="7">Seneste 7 dage</option>
+      <option value="30">Seneste 30 dage</option>
+      <option value="90">Seneste 3 måneder</option>
+      <option value="180">Seneste 6 måneder</option>
+      <option value="365">Seneste 12 måneder</option>
+      <option value="all">Siden første logning</option>
+    </select>
+    <div id="nd-ov-body"></div>
+  </div>
+
+  <div class="screen" id="nd-screen-weight">
+    <div class="topbar"><div><div class="date">Registrering</div><div class="title fr">Vægt</div></div></div>
+    <label class="fieldlbl">Dato</label>
+    <input type="date" id="nd-weight-date">
+    <label class="fieldlbl">Vægt (kg)</label>
+    <input type="number" id="nd-weight-val" step="0.1" placeholder="fx 78.4">
+    <div class="btnrow">
+      <button class="btn" id="nd-weight-save">Gem vægt</button>
+      <button class="btn ghost" id="nd-weight-reset" style="display:none">Ny</button>
+    </div>
+    <div id="nd-weight-chart-wrap"></div>
+    <div id="nd-weight-eta" class="hint" style="text-align:left; margin-top:4px; display:none;"></div>
+    <div class="section-lbl"><span>Historik</span></div>
+    <div id="nd-weight-list"></div>
+  </div>
+
+  <div class="screen" id="nd-screen-goals">
+    <div class="topbar"><div><div class="date">Indstillinger</div><div class="title fr">Dine mål</div></div></div>
+
+    <div class="section-lbl" style="margin-top:0;"><span>Ugemål (træning)</span></div>
+    <div class="topbar" style="margin-bottom:10px;">
+      <div>
+        <div class="date" id="nd-week-range"></div>
+        <div class="title fr" id="nd-week-title" style="font-size:17px;">Ugemål</div>
+      </div>
+      <div style="display:flex; align-items:center; gap:6px;">
+        <button class="daynav" id="nd-week-prev" aria-label="Forrige uge">&lsaquo;</button>
+        <button class="daynav" id="nd-week-next" aria-label="Næste uge">&rsaquo;</button>
+      </div>
+    </div>
+    <button class="btn ghost" id="nd-week-today-btn" style="width:auto; padding:5px 12px; font-size:12px; margin-bottom:14px; display:none;">Denne uge</button>
+    <div id="nd-week-goals-list"></div>
+    <button class="btn ghost" id="nd-week-copy-btn" style="margin-top:4px; display:none;">Kopiér sidste uges mål</button>
+    <button class="btn ghost" id="nd-week-goal-add-btn" style="margin-top:4px;">+ Tilføj ugemål</button>
+
+    <div style="margin-top:18px;">
+      <label class="fieldlbl">Tilfreds med ugen?</label>
+      <div style="display:flex; gap:8px; margin-bottom:8px;">
+        <button class="chip" id="nd-week-sat-yes">Tilfreds</button>
+        <button class="chip" id="nd-week-sat-no">Ikke tilfreds</button>
+      </div>
+      <textarea id="nd-week-sat-note" placeholder="Valgfri note om ugen..." style="height:50px;"></textarea>
+    </div>
+
+    <div class="section-lbl" style="margin-top:22px;"><span>Seneste uger</span></div>
+    <div id="nd-week-history"></div>
+
+    <div class="section-lbl" style="margin-top:28px;"><span>Kcal- og makromål</span></div>
+    <label class="fieldlbl">Kalorier (kcal/dag)</label>
+    <input type="number" id="nd-goal-kcal" placeholder="fx 2000">
+    <div class="goalgrid">
+      <div>
+        <label class="fieldlbl">Protein (g)</label>
+        <input type="number" id="nd-goal-protein" placeholder="fx 120">
+      </div>
+      <div>
+        <label class="fieldlbl">Kulhydrat (g)</label>
+        <input type="number" id="nd-goal-carbs" placeholder="fx 220">
+      </div>
+    </div>
+    <label class="fieldlbl">Fedt (g)</label>
+    <input type="number" id="nd-goal-fat" placeholder="fx 65">
+    <button class="btn" id="nd-goal-save" style="margin-top:8px">Gem mål</button>
+    <div id="nd-goal-msg" style="font-size:12px; color: var(--lime); margin-top:10px; display:none">Gemt.</div>
+
+    <label class="fieldlbl" style="margin-top:20px;">Målvægt (kg)</label>
+    <div class="btnrow" style="margin-top:0;">
+      <input type="number" id="nd-weight-goal" step="0.1" placeholder="fx 75.0" style="margin-bottom:0;">
+      <button class="btn ghost" id="nd-weight-goal-save" style="flex:0 0 auto; width:auto; padding:0 16px;">Gem</button>
+    </div>
+    <div id="nd-weight-goal-status" class="hint" style="text-align:left; margin-top:6px;"></div>
+
+    <div class="section-lbl" style="margin-top:28px;"><span>Historik for mål</span></div>
+    <div id="nd-goal-history"></div>
+
+    <div class="section-lbl" style="margin-top:28px;"><span>Marker periode som ikke sporet</span></div>
+    <div class="hint" style="text-align:left; margin-bottom:10px;">Til perioder du ikke har logget mad i, fx en pause på flere uger eller måneder. Trækkes ud af dine gennemsnit og "dage logget" i Overblik.</div>
+    <div class="goalgrid">
+      <div><label class="fieldlbl">Fra</label><input type="date" id="nd-bulkskip-from"></div>
+      <div><label class="fieldlbl">Til</label><input type="date" id="nd-bulkskip-to"></div>
+    </div>
+    <button class="btn ghost" id="nd-bulkskip-apply">Marker perioden</button>
+    <div id="nd-bulkskip-status" class="hint" style="text-align:left; margin-top:6px;"></div>
+
+    <div class="section-lbl" style="margin-top:28px;"><span>Data</span></div>
+    <div class="hint" style="text-align:left; margin-bottom:10px;">Tag din log, favoritter, vægt og mål med til en ny telefon.</div>
+    <div class="btnrow" style="margin-top:0;">
+      <button class="btn ghost" id="nd-export-btn">Eksporter data</button>
+      <button class="btn ghost" id="nd-import-btn">Importer data</button>
+    </div>
+    <div id="nd-backup-reminder" class="hint" style="text-align:left; margin-top:8px;"></div>
+
+    <button class="btn ghost" id="nd-help-btn" style="margin-top:28px;">Sådan virker appen</button>
+  </div>
+
+  <div class="nav">
+    <button class="active" id="nd-nav-today"><span class="dot"></span>I dag</button>
+    <button id="nd-nav-overview"><span class="dot"></span>Overblik</button>
+    <button id="nd-nav-weight"><span class="dot"></span>Vægt</button>
+    <button id="nd-nav-goals"><span class="dot"></span>Mål</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  const app = document.getElementById('nd-app');
+  const KEY_GOALS = 'nd_goals';
+  const KEY_FAVORITES = 'nd_favorites';
+  const KEY_WEIGHTS = 'nd_weights';
+  const KEY_WEIGHT_GOAL = 'nd_weight_goal';
+  const KEY_SKIPDAYS = 'nd_skipdays';
+  const KEY_RECENT = 'nd_recent_foods';
+  const KEY_COMBOS = 'nd_combos';
+  const KEY_LAST_EXPORT = 'nd_last_export';
+  const KEY_GAP_DISMISSED = 'nd_gap_dismissed_for';
+  const KEY_WEEK_SAT = 'nd_week_satisfaction';
+  const KEY_GOAL_HISTORY = 'nd_goal_history';
+  const KEY_NOTES = 'nd_notes';
+  const KEY_CUSTOM_TAGS = 'nd_custom_tags';
+  const DEFAULT_TAGS = ['Ferie', 'Rejse', 'Fødselsdag', 'Arbejdsmiddag', 'Fest', 'Menstruation', 'Sygdom', 'Restaurant', 'Alkohol'];
+  const EXERCISE_ACTIVITIES = ['Løb', 'Cykling', 'Svømning', 'Romaskine', 'Styrketræning', 'Hulen', 'Yoga'];
+  const WEEK_GOAL_METRICS = [
+    { id: 'minutes', label: 'Minutter' },
+    { id: 'km', label: 'Kilometer' },
+    { id: 'm', label: 'Meter' },
+    { id: 'count', label: 'Antal gange' }
+  ];
+  const metricLabel = id => (WEEK_GOAL_METRICS.find(m => m.id === id) || WEEK_GOAL_METRICS[0]).label;
+  const metricUnitShort = id => id === 'minutes' ? 'min' : id === 'km' ? 'km' : id === 'm' ? 'm' : 'x';
+
+  const MEALS = [
+    { id: 'breakfast', label: 'Morgenmad' },
+    { id: 'morning_snack', label: 'Formiddagsmad' },
+    { id: 'lunch', label: 'Frokost' },
+    { id: 'afternoon_snack', label: 'Eftermiddagsmad' },
+    { id: 'dinner', label: 'Aftensmad' },
+    { id: 'night_snack', label: 'Natmad' },
+    { id: 'other', label: 'Andet' }
+  ];
+  const mealLabel = id => (MEALS.find(m => m.id === id) || MEALS[6]).label;
+  function guessMeal(){
+    const h = new Date().getHours();
+    if (h < 10) return 'breakfast';
+    if (h < 11) return 'morning_snack';
+    if (h < 14) return 'lunch';
+    if (h < 17) return 'afternoon_snack';
+    if (h < 21) return 'dinner';
+    return 'night_snack';
+  }
+
+  const isoDate = d => d.toISOString().slice(0,10);
+  const diaryKey = dateStr => 'nd_diary_' + dateStr;
+  const exerciseKey = dateStr => 'nd_exercise_' + dateStr;
+  const weekGoalsKey = weekStr => 'nd_weekgoals_' + weekStr;
+
+  function isoWeekInfo(date){
+    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    const dayNum = (d.getUTCDay() + 6) % 7;
+    d.setUTCDate(d.getUTCDate() - dayNum + 3);
+    const firstThursday = new Date(Date.UTC(d.getUTCFullYear(), 0, 4));
+    const firstDayNum = (firstThursday.getUTCDay() + 6) % 7;
+    firstThursday.setUTCDate(firstThursday.getUTCDate() - firstDayNum + 3);
+    const week = 1 + Math.round((d - firstThursday) / (7*24*3600*1000));
+    return { year: d.getUTCFullYear(), week };
+  }
+  function isoWeekKeyFor(date){ const info = isoWeekInfo(date); return `${info.year}-W${String(info.week).padStart(2,'0')}`; }
+  function isoWeekStart(date){
+    const d = new Date(date);
+    const day = (d.getDay() + 6) % 7;
+    d.setDate(d.getDate() - day);
+    d.setHours(0,0,0,0);
+    return d;
+  }
+  function isoWeekDates(date){
+    const start = isoWeekStart(date);
+    const arr = [];
+    for (let i = 0; i < 7; i++) { const dd = new Date(start); dd.setDate(dd.getDate()+i); arr.push(isoDate(dd)); }
+    return arr;
+  }
+  const todayIso = () => isoDate(new Date());
+  const dateLabelFor = (dateStr) => {
+    const d = new Date(dateStr + 'T00:00:00');
+    return d.toLocaleDateString('da-DK', { weekday: 'long', day: 'numeric', month: 'long' });
+  };
+
+  let goals = { kcal: 2000, protein: 120, carbs: 220, fat: 65 };
+  let entries = [];
+  let favorites = [];
+  let weights = {};
+  let weightGoal = null;
+  let skipDays = {};
+  let recentFoods = [];
+  let combos = [];
+  let lastExportAt = null;
+  let goalHistory = [];
+  let notes = {};
+  let customTags = [];
+  let selectedDate = todayIso();
+  let exerciseEntries = [];
+  let weekAnchor = new Date();
+  let weekGoals = [];
+  let weekSat = {};
+  let searchDebounce = null;
+  let scanner = null;
+  let editingWeightDate = null;
+
+  async function loadGoals(){
+    try { const r = await window.storage.get(KEY_GOALS, false); if (r && r.value) goals = JSON.parse(r.value); } catch(e) {}
+  }
+  async function saveGoals(){ await window.storage.set(KEY_GOALS, JSON.stringify(goals), false); }
+
+  async function loadEntries(){
+    try { const r = await window.storage.get(diaryKey(selectedDate), false); entries = (r && r.value) ? JSON.parse(r.value) : []; }
+    catch(e) { entries = []; }
+  }
+  async function saveEntries(){ await window.storage.set(diaryKey(selectedDate), JSON.stringify(entries), false); }
+
+  async function loadExercise(){
+    try { const r = await window.storage.get(exerciseKey(selectedDate), false); exerciseEntries = (r && r.value) ? JSON.parse(r.value) : []; }
+    catch(e) { exerciseEntries = []; }
+  }
+  async function saveExercise(){ await window.storage.set(exerciseKey(selectedDate), JSON.stringify(exerciseEntries), false); }
+
+  async function loadWeekGoals(){
+    const key = weekGoalsKey(isoWeekKeyFor(weekAnchor));
+    try { const r = await window.storage.get(key, false); weekGoals = (r && r.value) ? JSON.parse(r.value) : []; }
+    catch(e) { weekGoals = []; }
+  }
+  async function saveWeekGoals(){
+    const key = weekGoalsKey(isoWeekKeyFor(weekAnchor));
+    await window.storage.set(key, JSON.stringify(weekGoals), false);
+  }
+
+  async function loadWeekSat(){
+    try { const r = await window.storage.get(KEY_WEEK_SAT, false); weekSat = (r && r.value) ? JSON.parse(r.value) : {}; }
+    catch(e) { weekSat = {}; }
+  }
+  async function saveWeekSat(){ await window.storage.set(KEY_WEEK_SAT, JSON.stringify(weekSat), false); }
+
+  async function loadFavorites(){
+    try { const r = await window.storage.get(KEY_FAVORITES, false); favorites = (r && r.value) ? JSON.parse(r.value) : []; }
+    catch(e) { favorites = []; }
+  }
+  async function saveFavorites(){ await window.storage.set(KEY_FAVORITES, JSON.stringify(favorites), false); }
+
+  async function loadWeights(){
+    try { const r = await window.storage.get(KEY_WEIGHTS, false); weights = (r && r.value) ? JSON.parse(r.value) : {}; }
+    catch(e) { weights = {}; }
+  }
+  async function saveWeights(){ await window.storage.set(KEY_WEIGHTS, JSON.stringify(weights), false); }
+
+  async function loadWeightGoal(){
+    try { const r = await window.storage.get(KEY_WEIGHT_GOAL, false); weightGoal = (r && r.value) ? Number(r.value) : null; }
+    catch(e) { weightGoal = null; }
+  }
+  async function saveWeightGoal(){
+    if (weightGoal === null) { try { await window.storage.delete(KEY_WEIGHT_GOAL, false); } catch(e) {} }
+    else { await window.storage.set(KEY_WEIGHT_GOAL, String(weightGoal), false); }
+  }
+
+  async function loadSkipDays(){
+    try { const r = await window.storage.get(KEY_SKIPDAYS, false); skipDays = (r && r.value) ? JSON.parse(r.value) : {}; }
+    catch(e) { skipDays = {}; }
+  }
+  async function saveSkipDays(){ await window.storage.set(KEY_SKIPDAYS, JSON.stringify(skipDays), false); }
+
+  async function loadRecentFoods(){
+    try { const r = await window.storage.get(KEY_RECENT, false); recentFoods = (r && r.value) ? JSON.parse(r.value) : []; }
+    catch(e) { recentFoods = []; }
+  }
+  async function saveRecentFoods(){ await window.storage.set(KEY_RECENT, JSON.stringify(recentFoods), false); }
+  async function addToRecent(item){
+    const key = (item.name+'|'+(item.brand||'')).toLowerCase();
+    recentFoods = recentFoods.filter(r => (r.name+'|'+(r.brand||'')).toLowerCase() !== key);
+    recentFoods.unshift({ name: item.name, brand: item.brand||'', kcal100: item.kcal100, protein100: item.protein100, carbs100: item.carbs100, fat100: item.fat100 });
+    recentFoods = recentFoods.slice(0, 20);
+    await saveRecentFoods();
+  }
+
+  async function loadCombos(){
+    try { const r = await window.storage.get(KEY_COMBOS, false); combos = (r && r.value) ? JSON.parse(r.value) : []; }
+    catch(e) { combos = []; }
+  }
+  async function saveCombos(){ await window.storage.set(KEY_COMBOS, JSON.stringify(combos), false); }
+
+  async function loadLastExport(){
+    try { const r = await window.storage.get(KEY_LAST_EXPORT, false); lastExportAt = (r && r.value) ? r.value : null; }
+    catch(e) { lastExportAt = null; }
+  }
+  async function saveLastExport(){ lastExportAt = new Date().toISOString(); await window.storage.set(KEY_LAST_EXPORT, lastExportAt, false); }
+
+  async function loadGoalHistory(){
+    try { const r = await window.storage.get(KEY_GOAL_HISTORY, false); goalHistory = (r && r.value) ? JSON.parse(r.value) : []; }
+    catch(e) { goalHistory = []; }
+  }
+  async function saveGoalHistory(){ await window.storage.set(KEY_GOAL_HISTORY, JSON.stringify(goalHistory), false); }
+
+  async function loadNotes(){
+    try { const r = await window.storage.get(KEY_NOTES, false); notes = (r && r.value) ? JSON.parse(r.value) : {}; }
+    catch(e) { notes = {}; }
+  }
+  async function saveNotes(){ await window.storage.set(KEY_NOTES, JSON.stringify(notes), false); }
+
+  async function loadCustomTags(){
+    try { const r = await window.storage.get(KEY_CUSTOM_TAGS, false); customTags = (r && r.value) ? JSON.parse(r.value) : []; }
+    catch(e) { customTags = []; }
+  }
+  async function saveCustomTags(){ await window.storage.set(KEY_CUSTOM_TAGS, JSON.stringify(customTags), false); }
+
+  function fmt(n){ return Math.round(n*10)/10; }
+  function escapeHtml(s){ const d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; }
+
+  function renderRing(sums){
+    const total = Math.max(sums.protein*4 + sums.carbs*4 + sums.fat*9, 0.0001);
+    const cs = getComputedStyle(app);
+    const segs = [
+      { val: sums.protein*4, color: cs.getPropertyValue('--coral') },
+      { val: sums.carbs*4, color: cs.getPropertyValue('--sand') },
+      { val: sums.fat*9, color: cs.getPropertyValue('--sage') }
+    ];
+    const r = 78, cx = 95, cy = 95, circ = 2*Math.PI*r;
+    let offset = 0;
+    const g = document.getElementById('nd-ring-arcs');
+    g.innerHTML = '';
+    segs.forEach(s => {
+      const frac = s.val/total;
+      if (frac <= 0) return;
+      const len = frac*circ;
+      const c = document.createElementNS('http://www.w3.org/2000/svg','circle');
+      c.setAttribute('cx', cx); c.setAttribute('cy', cy); c.setAttribute('r', r);
+      c.setAttribute('fill', 'none');
+      c.setAttribute('stroke', s.color.trim());
+      c.setAttribute('stroke-width', '14');
+      c.setAttribute('stroke-dasharray', `${len} ${circ-len}`);
+      c.setAttribute('stroke-dashoffset', -offset);
+      c.setAttribute('transform', `rotate(-90 ${cx} ${cy})`);
+      g.appendChild(c);
+      offset += len;
+    });
+  }
+
+  const MEAL_COLORS = {
+    breakfast: 'var(--sand)', morning_snack: 'var(--sage)', lunch: 'var(--lime)',
+    afternoon_snack: 'var(--coral)', dinner: 'var(--sky)', night_snack: 'var(--plum)', other: 'var(--text-lo)'
+  };
+  function renderMealDistribution(){
+    const wrap = document.getElementById('nd-meal-dist');
+    if (!wrap) return;
+    const totalKcal = entries.reduce((a,e) => a+e.kcal, 0);
+    if (totalKcal <= 0) { wrap.innerHTML = ''; return; }
+    const segs = MEALS.map(m => {
+      const kcal = entries.filter(e => (e.meal||'other') === m.id).reduce((a,e) => a+e.kcal, 0);
+      return { ...m, kcal };
+    }).filter(m => m.kcal > 0);
+    if (segs.length === 0) { wrap.innerHTML = ''; return; }
+    const bar = segs.map(s => `<div style="width:${(s.kcal/totalKcal)*100}%; background:${MEAL_COLORS[s.id]};"></div>`).join('');
+    const legend = segs.map(s => `<span style="display:inline-flex; align-items:center; gap:5px; font-size:11px; color:var(--text-mid); margin-right:14px; margin-bottom:4px;"><span style="width:8px; height:8px; border-radius:50%; background:${MEAL_COLORS[s.id]}; display:inline-block;"></span>${escapeHtml(s.label)} &middot; ${Math.round(s.kcal)}</span>`).join('');
+    wrap.innerHTML = `
+      <div class="section-lbl" style="margin-top:6px; margin-bottom:8px;"><span>Fordeling af kcal i dag</span></div>
+      <div style="display:flex; height:10px; border-radius:5px; overflow:hidden; margin-bottom:8px;">${bar}</div>
+      <div style="display:flex; flex-wrap:wrap;">${legend}</div>
+    `;
+  }
+
+  function sumEntries(list){
+    return list.reduce((a,e) => ({ kcal: a.kcal+e.kcal, protein: a.protein+e.protein, carbs: a.carbs+e.carbs, fat: a.fat+e.fat }), {kcal:0,protein:0,carbs:0,fat:0});
+  }
+
+  function renderToday(){
+    document.getElementById('nd-date').textContent = dateLabelFor(selectedDate);
+    document.getElementById('nd-day-picker').value = selectedDate;
+    document.getElementById('nd-day-next').disabled = selectedDate >= todayIso();
+    const yesterday = new Date(); yesterday.setDate(yesterday.getDate()-1);
+    let title = 'Log';
+    if (selectedDate === todayIso()) title = 'I dag';
+    else if (selectedDate === isoDate(yesterday)) title = 'I går';
+    document.getElementById('nd-day-title').textContent = title;
+    renderDayNote();
+    document.getElementById('nd-skipday-checkbox').checked = !!skipDays[selectedDate];
+    renderExerciseList();
+    const sums = sumEntries(entries);
+
+    const remaining = goals.kcal - Math.round(sums.kcal);
+    const kcalEl = document.getElementById('nd-ring-kcal');
+    const lblEl = document.getElementById('nd-ring-label');
+    const csRing = getComputedStyle(app);
+    if (remaining >= 0) {
+      kcalEl.textContent = remaining;
+      kcalEl.style.fill = csRing.getPropertyValue('--text-hi').trim();
+      lblEl.textContent = `TILBAGE AF ${goals.kcal} KCAL`;
+      lblEl.style.fill = csRing.getPropertyValue('--text-lo').trim();
+    } else {
+      kcalEl.textContent = Math.abs(remaining);
+      kcalEl.style.fill = csRing.getPropertyValue('--coral').trim();
+      lblEl.textContent = `OVER MÅLET PÅ ${goals.kcal} KCAL`;
+      lblEl.style.fill = csRing.getPropertyValue('--coral').trim();
+    }
+    renderRing(sums);
+    renderMealDistribution();
+
+    const setBar = (key, val, goal) => {
+      document.getElementById('nd-m-'+key).textContent = `${fmt(val)}/${goal}g`;
+      document.getElementById('nd-m-'+key+'-fill').style.width = Math.min(100, (val/Math.max(goal,1))*100) + '%';
+    };
+    setBar('protein', sums.protein, goals.protein);
+    setBar('carbs', sums.carbs, goals.carbs);
+    setBar('fat', sums.fat, goals.fat);
+
+    const wrap = document.getElementById('nd-meal-groups');
+    wrap.innerHTML = '';
+    if (entries.length === 0) {
+      wrap.innerHTML = '<div class="empty">Intet logget endnu. Tryk + for at tilføje en vare.</div>';
+      return;
+    }
+    MEALS.forEach(meal => {
+      const list = entries.filter(e => (e.meal || 'other') === meal.id);
+      if (list.length === 0) return;
+      const mealKcal = Math.round(sumEntries(list).kcal);
+      const section = document.createElement('div');
+      section.innerHTML = `<div class="section-lbl"><span>${meal.label}</span><span class="kc mono">${mealKcal} kcal</span></div>`;
+      list.forEach(e => {
+        const row = document.createElement('div');
+        row.className = 'entry';
+        const qtyLabel = e.unit === 'dl' ? `${fmt(e.qty)} dl (&approx;${Math.round(e.qty*(e.gramsPerDl||100))}g)` : `${e.qty}${e.unit}`;
+        row.innerHTML = `<div><div class="name">${escapeHtml(e.name)}</div><div class="sub">${qtyLabel} &middot; P${fmt(e.protein)} K${fmt(e.carbs)} F${fmt(e.fat)}</div></div>
+          <div style="display:flex; align-items:center;"><div class="kcal mono">${Math.round(e.kcal)}</div><button class="del" data-id="${e.id}">&times;</button></div>`;
+        row.addEventListener('click', (ev) => {
+          if (ev.target.classList.contains('del')) return;
+          openEditEntry(e);
+        });
+        row.querySelector('.del').addEventListener('click', async (ev) => {
+          ev.stopPropagation();
+          entries = entries.filter(x => x.id !== e.id);
+          await saveEntries();
+          renderToday();
+        });
+        section.appendChild(row);
+      });
+      const saveComboBtn = document.createElement('button');
+      saveComboBtn.className = 'btn ghost';
+      saveComboBtn.style.cssText = 'width:auto; padding:5px 12px; font-size:11px; margin:-2px 0 14px;';
+      saveComboBtn.textContent = 'Gem som kombination';
+      saveComboBtn.addEventListener('click', () => openSaveComboModal(list));
+      section.appendChild(saveComboBtn);
+      wrap.appendChild(section);
+    });
+  }
+
+  function openSaveComboModal(list){
+    const html = `
+      <div class="mhead"><div class="mtitle fr">Gem som kombination</div><button class="mclose" id="nd-sc-close">&times;</button></div>
+      <div class="hint" style="text-align:left;">${list.map(i => escapeHtml(i.name)).join(', ')}</div>
+      <label class="fieldlbl">Navn</label>
+      <input type="text" id="nd-sc-name" placeholder="fx Min morgenmad">
+      <div id="nd-sc-err" style="font-size:12px; color: var(--red); display:none; margin-bottom:8px;"></div>
+      <button class="btn" id="nd-sc-save" style="margin-top:6px">Gem</button>
+    `;
+    openModal(html);
+    document.getElementById('nd-sc-close').addEventListener('click', closeModal);
+    document.getElementById('nd-sc-save').addEventListener('click', async () => {
+      const name = document.getElementById('nd-sc-name').value.trim();
+      const err = document.getElementById('nd-sc-err');
+      if (!name) { err.textContent = 'Angiv et navn.'; err.style.display = 'block'; return; }
+      err.style.display = 'none';
+      combos.push({
+        id: 'c' + Date.now(),
+        name,
+        items: list.map(i => ({ name: i.name, brand: i.brand, kcal100: i.kcal100, protein100: i.protein100, carbs100: i.carbs100, fat100: i.fat100, qty: i.qty, unit: i.unit, gramsPerDl: i.gramsPerDl || null }))
+      });
+      await saveCombos();
+      closeModal();
+    });
+  }
+
+  async function findLastLoggedDate(){
+    const diaryMap = await gatherAllDiary();
+    const loggedDates = Object.keys(diaryMap).filter(d => diaryMap[d] && diaryMap[d].length > 0);
+    if (loggedDates.length === 0) return null;
+    return loggedDates.sort().pop();
+  }
+
+  async function checkLoggingGap(){
+    const banner = document.getElementById('nd-gap-banner');
+    if (!banner || selectedDate !== todayIso()) { if (banner) banner.style.display = 'none'; return; }
+    const lastLogged = await findLastLoggedDate();
+    if (!lastLogged) { banner.style.display = 'none'; return; }
+    const gapDays = Math.round((new Date(todayIso()+'T00:00:00') - new Date(lastLogged+'T00:00:00')) / 86400000) - 1;
+    if (gapDays < 3) { banner.style.display = 'none'; return; }
+    let dismissedFor = null;
+    try { const r = await window.storage.get(KEY_GAP_DISMISSED, false); dismissedFor = (r && r.value) ? r.value : null; } catch(e) {}
+    if (dismissedFor === lastLogged) { banner.style.display = 'none'; return; }
+    if (selectedDate !== todayIso()) return;
+
+    banner.innerHTML = `
+      <div style="margin-bottom:10px;">Det ser ud til, at du ikke har logget siden ${escapeHtml(dateLabelFor(lastLogged))} (${gapDays} dage siden). Vil du markere perioden som ikke sporet, så den ikke trækker ned i din statistik?</div>
+      <div class="btnrow" style="margin-top:0;">
+        <button class="btn ghost" id="nd-gap-dismiss">Nej tak</button>
+        <button class="btn" id="nd-gap-apply">Marker perioden</button>
+      </div>
+    `;
+    banner.style.display = 'block';
+    document.getElementById('nd-gap-dismiss').addEventListener('click', async () => {
+      try { await window.storage.set(KEY_GAP_DISMISSED, lastLogged, false); } catch(e) {}
+      banner.style.display = 'none';
+    });
+    document.getElementById('nd-gap-apply').addEventListener('click', async () => {
+      let d = new Date(lastLogged+'T00:00:00'); d.setDate(d.getDate()+1);
+      const end = new Date(); end.setDate(end.getDate()-1);
+      while (d <= end) { skipDays[isoDate(d)] = true; d.setDate(d.getDate()+1); }
+      await saveSkipDays();
+      try { await window.storage.set(KEY_GAP_DISMISSED, lastLogged, false); } catch(e) {}
+      banner.style.display = 'none';
+      document.getElementById('nd-skipday-checkbox').checked = !!skipDays[selectedDate];
+    });
+  }
+
+  function renderDayNote(){
+    const el = document.getElementById('nd-daynote');
+    if (!el) return;
+    const note = notes[selectedDate];
+    if (!note || (note.tags.length === 0 && !note.text)) {
+      el.innerHTML = `<button class="btn ghost" id="nd-daynote-btn" style="margin-bottom:16px;">+ Tilføj note for ${selectedDate === todayIso() ? 'i dag' : 'dagen'}</button>`;
+    } else {
+      el.innerHTML = `
+        <div class="entry" id="nd-daynote-btn" style="cursor:pointer; margin-bottom:16px;">
+          <div>
+            <div class="name">${note.tags.map(t => escapeHtml(t)).join(' · ') || 'Note'}</div>
+            ${note.text ? `<div class="sub">${escapeHtml(note.text)}</div>` : ''}
+          </div>
+          <div style="color:var(--text-lo); font-size:18px;">&rsaquo;</div>
+        </div>
+      `;
+    }
+    document.getElementById('nd-daynote-btn').addEventListener('click', () => openNoteModal(selectedDate));
+  }
+
+  function openNoteModal(dateStr){
+    const existing = notes[dateStr] || { tags: [], text: '' };
+    const selected = new Set(existing.tags);
+    const allTags = Array.from(new Set([...DEFAULT_TAGS, ...customTags]));
+
+    const html = `
+      <div class="mhead"><div class="mtitle fr">Note for ${escapeHtml(dateLabelFor(dateStr))}</div><button class="mclose" id="nd-note-close">&times;</button></div>
+      <div class="hint" style="text-align:left;">Tryk for at markere det, der passer på dagen.</div>
+      <div id="nd-note-chips" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px;"></div>
+      <div style="display:flex; gap:8px; margin-bottom:4px;">
+        <input type="text" id="nd-note-newtag" placeholder="Tilføj eget tag" style="margin-bottom:0;">
+        <button class="btn ghost" id="nd-note-addtag" style="width:auto; white-space:nowrap; padding:0 16px;">Tilføj</button>
+      </div>
+      <label class="fieldlbl">Note (valgfrit)</label>
+      <textarea id="nd-note-text" placeholder="fx uventet aftensmad hos venner" style="height:70px;"></textarea>
+      <div class="btnrow">
+        <button class="btn danger" id="nd-note-clear">Ryd</button>
+        <button class="btn" id="nd-note-save">Gem</button>
+      </div>
+    `;
+    openModal(html);
+    document.getElementById('nd-note-close').addEventListener('click', closeModal);
+    document.getElementById('nd-note-text').value = existing.text || '';
+
+    function renderChips(){
+      const wrap = document.getElementById('nd-note-chips');
+      wrap.innerHTML = '';
+      allTags.forEach(t => {
+        const btn = document.createElement('button');
+        btn.className = 'chip' + (selected.has(t) ? ' active' : '');
+        btn.textContent = t;
+        btn.addEventListener('click', () => {
+          if (selected.has(t)) selected.delete(t); else selected.add(t);
+          btn.classList.toggle('active');
+        });
+        wrap.appendChild(btn);
+      });
+    }
+    renderChips();
+
+    document.getElementById('nd-note-addtag').addEventListener('click', () => {
+      const input = document.getElementById('nd-note-newtag');
+      const val = input.value.trim();
+      if (!val) return;
+      if (!allTags.some(t => t.toLowerCase() === val.toLowerCase())) {
+        allTags.push(val);
+        if (!customTags.some(t => t.toLowerCase() === val.toLowerCase())) {
+          customTags.push(val);
+          saveCustomTags();
+        }
+      }
+      selected.add(allTags.find(t => t.toLowerCase() === val.toLowerCase()));
+      input.value = '';
+      renderChips();
+    });
+
+    document.getElementById('nd-note-clear').addEventListener('click', async () => {
+      delete notes[dateStr];
+      await saveNotes();
+      renderDayNote();
+      closeModal();
+    });
+    document.getElementById('nd-note-save').addEventListener('click', async () => {
+      const text = document.getElementById('nd-note-text').value.trim();
+      const tags = Array.from(selected);
+      if (tags.length === 0 && !text) { delete notes[dateStr]; }
+      else { notes[dateStr] = { tags, text }; }
+      await saveNotes();
+      renderDayNote();
+      closeModal();
+    });
+  }
+
+  function formatDuration(durationMin){
+    if (!durationMin) return null;
+    const totalSeconds = Math.round(durationMin*60);
+    const mm = Math.floor(totalSeconds/60);
+    const ss = totalSeconds%60;
+    return ss > 0 ? `${mm}:${String(ss).padStart(2,'0')} min` : `${mm} min`;
+  }
+
+  function renderExerciseList(){
+    const wrap = document.getElementById('nd-exercise-list');
+    if (!wrap) return;
+    if (exerciseEntries.length === 0) {
+      wrap.innerHTML = '<div class="empty" style="padding:16px 10px;">Ingen træning logget.</div>';
+      return;
+    }
+    wrap.innerHTML = '';
+    exerciseEntries.forEach(e => {
+      const parts = [];
+      if (e.type) parts.push(e.type);
+      const durLabel = formatDuration(e.duration_min);
+      if (durLabel) parts.push(durLabel);
+      if (e.distance_value) parts.push(`${fmt(e.distance_value)} ${e.distance_unit}`);
+      const row = document.createElement('div');
+      row.className = 'entry';
+      row.innerHTML = `<div><div class="name">${escapeHtml(e.activity)}</div><div class="sub">${parts.join(' &middot; ') || '&mdash;'}</div></div>
+        <button class="del" data-id="${e.id}">&times;</button>`;
+      row.addEventListener('click', (ev) => { if (ev.target.classList.contains('del')) return; openExerciseModal(e); });
+      row.querySelector('.del').addEventListener('click', async (ev) => {
+        ev.stopPropagation();
+        exerciseEntries = exerciseEntries.filter(x => x.id !== e.id);
+        await saveExercise();
+        renderExerciseList();
+      });
+      wrap.appendChild(row);
+    });
+  }
+
+  function openExerciseModal(existing){
+    const isEdit = !!existing;
+    const html = `
+      <div class="mhead"><div class="mtitle fr">${isEdit ? 'Rediger træning' : 'Tilføj træning'}</div><button class="mclose" id="nd-ex-close">&times;</button></div>
+      <div id="nd-ex-chips" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px;"></div>
+      <label class="fieldlbl">Aktivitet</label>
+      <input type="text" id="nd-ex-activity" placeholder="fx Løbetur i skoven">
+      <div id="nd-ex-type-wrap" style="display:none; margin-bottom:10px;">
+        <label class="fieldlbl">Type</label>
+        <select id="nd-ex-type">
+          <option value="">Vælg...</option>
+          <option value="Hold">Hold</option>
+          <option value="Selvtræning">Selvtræning</option>
+        </select>
+      </div>
+      <label class="fieldlbl">Varighed</label>
+      <div style="display:flex; gap:8px; align-items:center; margin-bottom:10px;">
+        <input type="number" id="nd-ex-duration-min" placeholder="min" min="0" style="flex:1; margin-bottom:0;">
+        <span style="color:var(--text-lo);">:</span>
+        <input type="number" id="nd-ex-duration-sec" placeholder="sek" min="0" max="59" style="flex:1; margin-bottom:0;">
+      </div>
+      <label class="fieldlbl">Distance</label>
+      <div style="display:flex; gap:8px;">
+        <input type="number" id="nd-ex-distance" placeholder="fx 12" style="margin-bottom:0;">
+        <select id="nd-ex-unit" style="width:auto; flex:0 0 68px; margin-bottom:0;">
+          <option value="km">km</option>
+          <option value="m">m</option>
+        </select>
+      </div>
+      <div id="nd-ex-err" style="font-size:12px; color: var(--red); display:none; margin:8px 0;"></div>
+      <div class="btnrow">
+        ${isEdit ? '<button class="btn danger" id="nd-ex-del">Slet</button>' : ''}
+        <button class="btn" id="nd-ex-save">${isEdit ? 'Gem ændringer' : 'Tilføj'}</button>
+      </div>
+    `;
+    openModal(html);
+    document.getElementById('nd-ex-close').addEventListener('click', closeModal);
+
+    const isHulen = () => document.getElementById('nd-ex-activity').value.trim().toLowerCase() === 'hulen';
+    const syncTypeVisibility = () => {
+      document.getElementById('nd-ex-type-wrap').style.display = isHulen() ? 'block' : 'none';
+    };
+    document.getElementById('nd-ex-activity').addEventListener('input', syncTypeVisibility);
+
+    const chipsWrap = document.getElementById('nd-ex-chips');
+    EXERCISE_ACTIVITIES.forEach(a => {
+      const btn = document.createElement('button');
+      btn.className = 'chip';
+      btn.type = 'button';
+      btn.textContent = a;
+      btn.addEventListener('click', () => { document.getElementById('nd-ex-activity').value = a; syncTypeVisibility(); });
+      chipsWrap.appendChild(btn);
+    });
+
+    if (isEdit) {
+      document.getElementById('nd-ex-activity').value = existing.activity;
+      syncTypeVisibility();
+      if (existing.type) document.getElementById('nd-ex-type').value = existing.type;
+      if (existing.duration_min) {
+        const totalSeconds = Math.round(existing.duration_min*60);
+        document.getElementById('nd-ex-duration-min').value = Math.floor(totalSeconds/60);
+        document.getElementById('nd-ex-duration-sec').value = totalSeconds%60;
+      }
+      document.getElementById('nd-ex-distance').value = existing.distance_value || '';
+      document.getElementById('nd-ex-unit').value = existing.distance_unit || 'km';
+      document.getElementById('nd-ex-del').addEventListener('click', async () => {
+        exerciseEntries = exerciseEntries.filter(x => x.id !== existing.id);
+        await saveExercise();
+        renderExerciseList();
+        closeModal();
+      });
+    }
+
+    document.getElementById('nd-ex-save').addEventListener('click', async () => {
+      const activity = document.getElementById('nd-ex-activity').value.trim();
+      const type = isHulen() ? (document.getElementById('nd-ex-type').value || null) : null;
+      const minPart = Number(document.getElementById('nd-ex-duration-min').value) || 0;
+      const secPart = Number(document.getElementById('nd-ex-duration-sec').value) || 0;
+      const duration = (minPart > 0 || secPart > 0) ? (minPart + secPart/60) : null;
+      const distance = Number(document.getElementById('nd-ex-distance').value) || null;
+      const unit = document.getElementById('nd-ex-unit').value;
+      const err = document.getElementById('nd-ex-err');
+      if (!activity) { err.textContent = 'Angiv en aktivitet.'; err.style.display = 'block'; return; }
+      if (!duration && !distance) { err.textContent = 'Angiv varighed eller distance.'; err.style.display = 'block'; return; }
+      err.style.display = 'none';
+      if (isEdit) {
+        exerciseEntries = exerciseEntries.map(x => x.id === existing.id ? { ...x, activity, type, duration_min: duration, distance_value: distance, distance_unit: unit } : x);
+      } else {
+        exerciseEntries.push({ id: 'x' + Date.now(), activity, type, duration_min: duration, distance_value: distance, distance_unit: unit });
+      }
+      await saveExercise();
+      renderExerciseList();
+      closeModal();
+    });
+  }
+  document.getElementById('nd-fab-exercise').addEventListener('click', () => openExerciseModal(null));
+
+  async function renderWeekGoalsScreen(){
+    const info = isoWeekInfo(weekAnchor);
+    const weekKey = isoWeekKeyFor(weekAnchor);
+    document.getElementById('nd-week-title').textContent = `Uge ${info.week}, ${info.year}`;
+    const dates = isoWeekDates(weekAnchor);
+    const rangeLbl = `${new Date(dates[0]+'T00:00:00').toLocaleDateString('da-DK',{day:'numeric',month:'short'})} – ${new Date(dates[6]+'T00:00:00').toLocaleDateString('da-DK',{day:'numeric',month:'short'})}`;
+    document.getElementById('nd-week-range').textContent = rangeLbl;
+    document.getElementById('nd-week-today-btn').style.display = weekKey === isoWeekKeyFor(new Date()) ? 'none' : 'block';
+    document.getElementById('nd-week-copy-btn').style.display = weekGoals.length === 0 ? 'block' : 'none';
+
+    const list = document.getElementById('nd-week-goals-list');
+    list.innerHTML = '<div class="hint">Henter data...</div>';
+
+    const exMap = await getExerciseForDates(dates);
+    const weekEntries = dates.reduce((a,d) => a.concat(exMap[d] || []), []);
+
+    if (weekGoals.length === 0) {
+      list.innerHTML = '<div class="empty">Ingen mål sat for denne uge endnu.</div>';
+    } else {
+      list.innerHTML = '';
+      weekGoals.forEach(g => {
+        const status = computeGoalStatus(g, weekEntries);
+        const row = document.createElement('div');
+        row.className = 'goalrow' + (status.done ? ' done' : '');
+        row.innerHTML = `
+          <div class="ghead">
+            <div class="gname">${status.done ? '<span class="gcheck">&check;</span>' : ''}${escapeHtml(g.activity)}</div>
+            <div class="gstat">${status.text}</div>
+          </div>
+          <div class="gtrack"><div class="gfill" style="width:${status.pct}%"></div></div>
+        `;
+        row.addEventListener('click', () => openWeekGoalModal(g));
+        list.appendChild(row);
+      });
+    }
+
+    const sat = weekSat[weekKey] || { satisfied: null, note: '' };
+    document.getElementById('nd-week-sat-yes').classList.toggle('active', sat.satisfied === 'yes');
+    document.getElementById('nd-week-sat-no').classList.toggle('active', sat.satisfied === 'no');
+    document.getElementById('nd-week-sat-note').value = sat.note || '';
+
+    renderWeekGoalsHistory();
+  }
+
+  document.getElementById('nd-week-sat-yes').addEventListener('click', async () => {
+    const weekKey = isoWeekKeyFor(weekAnchor);
+    const current = weekSat[weekKey] || { satisfied: null, note: '' };
+    current.satisfied = current.satisfied === 'yes' ? null : 'yes';
+    weekSat[weekKey] = current;
+    await saveWeekSat();
+    renderWeekGoalsScreen();
+  });
+  document.getElementById('nd-week-sat-no').addEventListener('click', async () => {
+    const weekKey = isoWeekKeyFor(weekAnchor);
+    const current = weekSat[weekKey] || { satisfied: null, note: '' };
+    current.satisfied = current.satisfied === 'no' ? null : 'no';
+    weekSat[weekKey] = current;
+    await saveWeekSat();
+    renderWeekGoalsScreen();
+  });
+  document.getElementById('nd-week-sat-note').addEventListener('blur', async (e) => {
+    const weekKey = isoWeekKeyFor(weekAnchor);
+    const current = weekSat[weekKey] || { satisfied: null, note: '' };
+    current.note = e.target.value.trim();
+    if (current.satisfied === null && !current.note) { delete weekSat[weekKey]; }
+    else { weekSat[weekKey] = current; }
+    await saveWeekSat();
+  });
+
+  document.getElementById('nd-week-copy-btn').addEventListener('click', async () => {
+    const prevAnchor = new Date(weekAnchor); prevAnchor.setDate(prevAnchor.getDate()-7);
+    let prevGoals = [];
+    try { const r = await window.storage.get(weekGoalsKey(isoWeekKeyFor(prevAnchor)), false); prevGoals = (r && r.value) ? JSON.parse(r.value) : []; }
+    catch(e) { prevGoals = []; }
+    if (prevGoals.length === 0) {
+      const btn = document.getElementById('nd-week-copy-btn');
+      const original = btn.textContent;
+      btn.textContent = 'Ingen mål i forrige uge';
+      setTimeout(() => btn.textContent = original, 1800);
+      return;
+    }
+    weekGoals = prevGoals.map(g => ({ ...g, id: 'w' + Date.now() + Math.random().toString(36).slice(2,6) }));
+    await saveWeekGoals();
+    renderWeekGoalsScreen();
+  });
+
+  async function renderWeekGoalsHistory(){
+    const el = document.getElementById('nd-week-history');
+    if (!el) return;
+    el.innerHTML = '<div class="hint">Henter historik...</div>';
+    const weekAnchors = [];
+    for (let i = 0; i < 12; i++) {
+      const d = new Date(); d.setDate(d.getDate() - 7*i);
+      weekAnchors.unshift(d);
+    }
+    const rows = await Promise.all(weekAnchors.map(async (wd) => {
+      const info = isoWeekInfo(wd);
+      const wkey = isoWeekKeyFor(wd);
+      let goals = [];
+      try { const r = await window.storage.get(weekGoalsKey(wkey), false); goals = (r && r.value) ? JSON.parse(r.value) : []; } catch(e) { goals = []; }
+      if (goals.length === 0) return { wd, wkey, info, none: true };
+      const dates = isoWeekDates(wd);
+      const exMap = await getExerciseForDates(dates);
+      const weekEntries = dates.reduce((a,d) => a.concat(exMap[d] || []), []);
+      const metCount = goals.filter(g => computeGoalStatus(g, weekEntries).done).length;
+      return { wd, wkey, info, metCount, total: goals.length };
+    }));
+    el.innerHTML = '';
+    rows.slice().reverse().forEach(r => {
+      const row = document.createElement('div');
+      row.className = 'weightrow';
+      const sat = weekSat[r.wkey];
+      const satMark = sat && sat.satisfied === 'yes' ? '<span style="color:var(--sage); margin-left:6px;">&check;</span>' : sat && sat.satisfied === 'no' ? '<span style="color:var(--coral); margin-left:6px;">&times;</span>' : '';
+      if (r.none) {
+        row.innerHTML = `<div class="wd">Uge ${r.info.week}, ${r.info.year}</div><div class="wv" style="color:var(--text-lo); font-size:12px;">Ingen mål${satMark}</div>`;
+      } else {
+        const allMet = r.metCount === r.total;
+        row.innerHTML = `<div class="wd">Uge ${r.info.week}, ${r.info.year}</div><div class="wv" style="color:${allMet?'var(--sage)':'var(--text-mid)'}; font-size:13px;">${r.metCount}/${r.total} mål${satMark}</div>`;
+      }
+      row.addEventListener('click', () => goToWeek(r.wd));
+      el.appendChild(row);
+    });
+  }
+
+  async function getExerciseForDates(dates){
+    const map = {};
+    await Promise.all(dates.map(async dstr => {
+      try { const r = await window.storage.get(exerciseKey(dstr), false); map[dstr] = (r && r.value) ? JSON.parse(r.value) : []; }
+      catch(e) { map[dstr] = []; }
+    }));
+    return map;
+  }
+
+  function computeAchievedForMetric(activity, metric, weekEntries){
+    const matching = weekEntries.filter(e => e.activity.trim().toLowerCase() === activity.trim().toLowerCase());
+    if (metric === 'count') return matching.length;
+    if (metric === 'minutes') return matching.reduce((a,e) => a + (e.duration_min || 0), 0);
+    if (metric === 'km') return matching.reduce((a,e) => {
+      if (!e.distance_value) return a;
+      return a + (e.distance_unit === 'm' ? e.distance_value/1000 : e.distance_value);
+    }, 0);
+    if (metric === 'm') return matching.reduce((a,e) => {
+      if (!e.distance_value) return a;
+      return a + (e.distance_unit === 'km' ? e.distance_value*1000 : e.distance_value);
+    }, 0);
+    return 0;
+  }
+  function computeAchieved(goal, weekEntries){
+    return computeAchievedForMetric(goal.activity, goal.metric, weekEntries);
+  }
+  function computeGoalStatus(goal, weekEntries){
+    const achieved = computeAchieved(goal, weekEntries);
+    const pct1 = Math.min(100, (achieved/Math.max(goal.target,0.0001))*100);
+    const done1 = achieved >= goal.target;
+    if (!goal.altMetric) {
+      return { done: done1, pct: pct1, text: `${fmt(achieved)}/${fmt(goal.target)} ${metricUnitShort(goal.metric)}` };
+    }
+    const altAchieved = computeAchievedForMetric(goal.activity, goal.altMetric, weekEntries);
+    const pct2 = Math.min(100, (altAchieved/Math.max(goal.altTarget,0.0001))*100);
+    const done2 = altAchieved >= goal.altTarget;
+    return {
+      done: done1 || done2,
+      pct: Math.max(pct1, pct2),
+      text: `${fmt(achieved)}/${fmt(goal.target)} ${metricUnitShort(goal.metric)} eller ${fmt(altAchieved)}/${fmt(goal.altTarget)} ${metricUnitShort(goal.altMetric)}`
+    };
+  }
+
+  async function goToWeek(newAnchor){
+    weekAnchor = newAnchor;
+    await loadWeekGoals();
+    renderWeekGoalsScreen();
+  }
+  document.getElementById('nd-week-prev').addEventListener('click', () => {
+    const d = new Date(weekAnchor); d.setDate(d.getDate()-7); goToWeek(d);
+  });
+  document.getElementById('nd-week-next').addEventListener('click', () => {
+    const d = new Date(weekAnchor); d.setDate(d.getDate()+7); goToWeek(d);
+  });
+  document.getElementById('nd-week-today-btn').addEventListener('click', () => goToWeek(new Date()));
+
+  function openWeekGoalModal(existing){
+    const isEdit = !!existing;
+    const hasAlt = isEdit && existing.altMetric;
+    const html = `
+      <div class="mhead"><div class="mtitle fr">${isEdit ? 'Rediger ugemål' : 'Tilføj ugemål'}</div><button class="mclose" id="nd-wg-close">&times;</button></div>
+      <div id="nd-wg-chips" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px;"></div>
+      <label class="fieldlbl">Aktivitet</label>
+      <input type="text" id="nd-wg-activity" placeholder="fx Cykling">
+      <label class="fieldlbl">Mål-type</label>
+      <select id="nd-wg-metric">${WEEK_GOAL_METRICS.map(m => `<option value="${m.id}">${m.label}</option>`).join('')}</select>
+      <label class="fieldlbl">Mindst</label>
+      <input type="number" id="nd-wg-target" placeholder="fx 120">
+
+      <label class="chk"><input type="checkbox" id="nd-wg-alt-toggle"${hasAlt ? ' checked' : ''}> Tilføj alternativ (opfyld enten dette eller det andet)</label>
+      <div id="nd-wg-alt-wrap" style="display:${hasAlt ? 'block' : 'none'};">
+        <label class="fieldlbl">Eller mål-type</label>
+        <select id="nd-wg-alt-metric">${WEEK_GOAL_METRICS.map(m => `<option value="${m.id}">${m.label}</option>`).join('')}</select>
+        <label class="fieldlbl">Mindst</label>
+        <input type="number" id="nd-wg-alt-target" placeholder="fx 30">
+      </div>
+
+      <div id="nd-wg-err" style="font-size:12px; color: var(--red); display:none; margin:8px 0;"></div>
+      <div class="btnrow">
+        ${isEdit ? '<button class="btn danger" id="nd-wg-del">Slet</button>' : ''}
+        <button class="btn" id="nd-wg-save">${isEdit ? 'Gem ændringer' : 'Tilføj'}</button>
+      </div>
+    `;
+    openModal(html);
+    document.getElementById('nd-wg-close').addEventListener('click', closeModal);
+    document.getElementById('nd-wg-alt-toggle').addEventListener('change', (e) => {
+      document.getElementById('nd-wg-alt-wrap').style.display = e.target.checked ? 'block' : 'none';
+    });
+
+    const chipsWrap = document.getElementById('nd-wg-chips');
+    EXERCISE_ACTIVITIES.forEach(a => {
+      const btn = document.createElement('button');
+      btn.className = 'chip';
+      btn.type = 'button';
+      btn.textContent = a;
+      btn.addEventListener('click', () => { document.getElementById('nd-wg-activity').value = a; });
+      chipsWrap.appendChild(btn);
+    });
+
+    if (isEdit) {
+      document.getElementById('nd-wg-activity').value = existing.activity;
+      document.getElementById('nd-wg-metric').value = existing.metric;
+      document.getElementById('nd-wg-target').value = existing.target;
+      if (hasAlt) {
+        document.getElementById('nd-wg-alt-metric').value = existing.altMetric;
+        document.getElementById('nd-wg-alt-target').value = existing.altTarget;
+      }
+      document.getElementById('nd-wg-del').addEventListener('click', async () => {
+        weekGoals = weekGoals.filter(x => x.id !== existing.id);
+        await saveWeekGoals();
+        renderWeekGoalsScreen();
+        closeModal();
+      });
+    }
+
+    document.getElementById('nd-wg-save').addEventListener('click', async () => {
+      const activity = document.getElementById('nd-wg-activity').value.trim();
+      const metric = document.getElementById('nd-wg-metric').value;
+      const target = Number(document.getElementById('nd-wg-target').value);
+      const useAlt = document.getElementById('nd-wg-alt-toggle').checked;
+      const altMetric = useAlt ? document.getElementById('nd-wg-alt-metric').value : null;
+      const altTarget = useAlt ? Number(document.getElementById('nd-wg-alt-target').value) : null;
+      const err = document.getElementById('nd-wg-err');
+      if (!activity) { err.textContent = 'Angiv en aktivitet.'; err.style.display = 'block'; return; }
+      if (!target || target <= 0) { err.textContent = 'Angiv et mål større end 0.'; err.style.display = 'block'; return; }
+      if (useAlt && (!altTarget || altTarget <= 0)) { err.textContent = 'Angiv et alternativt mål større end 0.'; err.style.display = 'block'; return; }
+      err.style.display = 'none';
+      if (isEdit) {
+        weekGoals = weekGoals.map(x => x.id === existing.id ? { ...x, activity, metric, target, altMetric, altTarget } : x);
+      } else {
+        weekGoals.push({ id: 'w' + Date.now(), activity, metric, target, altMetric, altTarget });
+      }
+      await saveWeekGoals();
+      renderWeekGoalsScreen();
+      closeModal();
+    });
+  }
+  document.getElementById('nd-week-goal-add-btn').addEventListener('click', () => openWeekGoalModal(null));
+
+  document.getElementById('nd-skipday-checkbox').addEventListener('change', async (e) => {
+    if (e.target.checked) skipDays[selectedDate] = true; else delete skipDays[selectedDate];
+    await saveSkipDays();
+  });
+
+  async function goToDate(dstr){
+    const t = todayIso();
+    if (dstr > t) dstr = t;
+    selectedDate = dstr;
+    await Promise.all([loadEntries(), loadExercise()]);
+    renderToday();
+  }
+  document.getElementById('nd-day-prev').addEventListener('click', () => {
+    const d = new Date(selectedDate+'T00:00:00');
+    d.setDate(d.getDate()-1);
+    goToDate(isoDate(d));
+  });
+  document.getElementById('nd-day-next').addEventListener('click', () => {
+    const d = new Date(selectedDate+'T00:00:00');
+    d.setDate(d.getDate()+1);
+    goToDate(isoDate(d));
+  });
+  document.getElementById('nd-day-picker').addEventListener('change', (e) => {
+    if (e.target.value) goToDate(e.target.value);
+  });
+
+  function switchScreen(name){
+    ['today','overview','weight','goals'].forEach(n => {
+      document.getElementById('nd-screen-'+n).classList.toggle('active', n===name);
+      document.getElementById('nd-nav-'+n).classList.toggle('active', n===name);
+    });
+    if (name === 'overview') renderOverview(currentRange);
+    if (name === 'goals') renderWeekGoalsScreen();
+    if (name === 'weight') renderWeightScreen();
+  }
+  document.getElementById('nd-nav-today').addEventListener('click', () => { goToDate(todayIso()); switchScreen('today'); checkLoggingGap(); });
+  document.getElementById('nd-nav-overview').addEventListener('click', () => switchScreen('overview'));
+  document.getElementById('nd-nav-weight').addEventListener('click', () => switchScreen('weight'));
+  document.getElementById('nd-nav-goals').addEventListener('click', () => switchScreen('goals'));
+
+  document.getElementById('nd-help-btn').addEventListener('click', () => {
+    const sect = (title, body) => `<div class="section-lbl" style="margin-top:18px;"><span>${title}</span></div><div class="hint" style="text-align:left; line-height:1.5;">${body}</div>`;
+    const html = `
+      <div class="mhead"><div class="mtitle fr">Sådan virker appen</div><button class="mclose" id="nd-help-close">&times;</button></div>
+      ${sect('I dag', `Tryk + for at logge mad – søg, scan en stregkode, brug en genvej (kombination, favorit eller seneste vare), eller indtast selv. Måltider er inddelt i kategorier (morgenmad, frokost, osv.). Tryk på en logget vare for at rette eller slette den. Brug pilene eller datovælgeren øverst til at logge bagud. Sæt "ikke sporet"-fluebenet på dage, du bevidst ikke logger mad – de trækkes ud af din statistik. Du kan også gemme en note og tags for dagen (fx Ferie, Fest) og logge træning med tid/distance nederst.`)}
+      ${sect('Overblik', `Vælg en periode i dropdownen. Du får kalorier pr. dag, en opdeling af hvilke måltider du typisk bruger flest kalorier på, sammenhæng mellem dine noter/tags og kalorieindtag, samt en opsummering af din træning i perioden.`)}
+      ${sect('Vægt', `Log din vægt for enhver dato. Sæt en målvægt under Mål for at få farvede zoner i grafen (grøn = indenfor 1 kg, gul-grøn = indenfor 2 kg) samt et estimat for hvornår du når målet, ud fra din nuværende udvikling. Grafen viser også dit 7-dages gennemsnitlige kalorieindtag ved siden af vægtkurven.`)}
+      ${sect('Mål', `Sæt dine mål for kcal/protein/kulhydrat/fedt (med historik over ændringer) og din målvægt. Under Ugemål sætter du ugentlige træningsmål – de kan variere fra uge til uge, du kan kopiere sidste uges opsætning, markere om du var tilfreds med ugen, og se de seneste 12 uger på én gang. "Marker periode som ikke sporet" bruges til bagudrettet at udelukke fx en pause på flere uger/måneder fra din statistik.`)}
+      ${sect('Data', `Under Mål kan du eksportere al din data til en fil (til backup eller telefonskifte) og importere den igen – ny data lægges oveni det, du allerede har, uden at overskrive noget.`)}
+    `;
+    openModal(html);
+    document.getElementById('nd-help-close').addEventListener('click', closeModal);
+  });
+
+  document.getElementById('nd-goal-save').addEventListener('click', async () => {
+    goals = {
+      kcal: Number(document.getElementById('nd-goal-kcal').value) || 2000,
+      protein: Number(document.getElementById('nd-goal-protein').value) || 0,
+      carbs: Number(document.getElementById('nd-goal-carbs').value) || 0,
+      fat: Number(document.getElementById('nd-goal-fat').value) || 0
+    };
+    await saveGoals();
+    const last = goalHistory[goalHistory.length - 1];
+    const changed = !last || last.kcal !== goals.kcal || last.protein !== goals.protein || last.carbs !== goals.carbs || last.fat !== goals.fat;
+    if (changed) {
+      goalHistory.push({ timestamp: new Date().toISOString(), kcal: goals.kcal, protein: goals.protein, carbs: goals.carbs, fat: goals.fat });
+      await saveGoalHistory();
+      renderGoalHistory();
+    }
+    const msg = document.getElementById('nd-goal-msg');
+    msg.style.display = 'block';
+    setTimeout(() => msg.style.display = 'none', 1800);
+    renderToday();
+  });
+  function renderBackupReminder(){
+    const el = document.getElementById('nd-backup-reminder');
+    if (!el) return;
+    if (!lastExportAt) {
+      el.textContent = 'Du har aldrig eksporteret data. Overvej at tage en backup.';
+      el.style.color = 'var(--sand)';
+      return;
+    }
+    const last = new Date(lastExportAt);
+    const daysSince = Math.floor((Date.now()-last.getTime())/86400000);
+    const dateStr = last.toLocaleDateString('da-DK', { day:'numeric', month:'short', year:'numeric' });
+    if (daysSince > 30) {
+      el.textContent = `Sidst eksporteret: ${dateStr} (${daysSince} dage siden) – overvej en ny backup.`;
+      el.style.color = 'var(--sand)';
+    } else {
+      el.textContent = `Sidst eksporteret: ${dateStr}.`;
+      el.style.color = 'var(--text-lo)';
+    }
+  }
+
+  function renderGoalHistory(){
+    const el = document.getElementById('nd-goal-history');
+    if (!el) return;
+    if (goalHistory.length === 0) {
+      el.innerHTML = '<div class="empty">Ingen ændringer registreret endnu.</div>';
+      return;
+    }
+    el.innerHTML = '';
+    goalHistory.slice().reverse().forEach(h => {
+      const d = new Date(h.timestamp);
+      const dateStr = d.toLocaleDateString('da-DK', { day: 'numeric', month: 'short', year: 'numeric' });
+      const timeStr = d.toLocaleTimeString('da-DK', { hour: '2-digit', minute: '2-digit' });
+      const row = document.createElement('div');
+      row.className = 'weightrow';
+      row.style.cursor = 'default';
+      row.innerHTML = `<div class="wd">${dateStr} kl. ${timeStr}</div><div class="wv mono" style="font-size:12px; color: var(--text-mid);">${h.kcal} kcal &middot; P${h.protein} K${h.carbs} F${h.fat}</div>`;
+      el.appendChild(row);
+    });
+  }
+  function renderGoalsForm(){
+    document.getElementById('nd-goal-kcal').value = goals.kcal;
+    document.getElementById('nd-goal-protein').value = goals.protein;
+    document.getElementById('nd-goal-carbs').value = goals.carbs;
+    document.getElementById('nd-goal-fat').value = goals.fat;
+    document.getElementById('nd-weight-goal').value = weightGoal !== null ? weightGoal : '';
+  }
+
+  function openModal(html){
+    const back = document.createElement('div');
+    back.className = 'modal-back';
+    back.id = 'nd-modal-back';
+    back.innerHTML = `<div class="modal">${html}</div>`;
+    back.addEventListener('click', (e) => { if (e.target === back) closeModal(); });
+    document.body.appendChild(back);
+    return back;
+  }
+  function closeModal(){
+    stopScanner();
+    const b = document.getElementById('nd-modal-back');
+    if (b) b.remove();
+  }
+
+  document.getElementById('nd-fab').addEventListener('click', () => {
+    const html = `
+      <div class="mhead"><div class="mtitle fr">Tilføj vare</div><button class="mclose" id="nd-mclose">&times;</button></div>
+      ${selectedDate !== todayIso() ? `<div class="hint" style="text-align:left; margin-top:-6px;">Tilføjes til ${dateLabelFor(selectedDate)}</div>` : ''}
+      <div class="segtabs">
+        <button id="nd-tab-search" class="active">Søg</button>
+        <button id="nd-tab-scan">Scan stregkode</button>
+        <button id="nd-tab-fav">Genveje</button>
+        <button id="nd-tab-manual">Indtast selv</button>
+      </div>
+      <div id="nd-tab-body"></div>
+    `;
+    openModal(html);
+    document.getElementById('nd-mclose').addEventListener('click', closeModal);
+    document.getElementById('nd-tab-search').addEventListener('click', showSearchTab);
+    document.getElementById('nd-tab-scan').addEventListener('click', showScanTab);
+    document.getElementById('nd-tab-fav').addEventListener('click', showFavTab);
+    document.getElementById('nd-tab-manual').addEventListener('click', showManualTab);
+    showSearchTab();
+  });
+
+  function setActiveTab(id){
+    ['search','scan','fav','manual'].forEach(t => document.getElementById('nd-tab-'+t).classList.toggle('active', t===id));
+  }
+
+  function showSearchTab(){
+    stopScanner();
+    setActiveTab('search');
+    const body = document.getElementById('nd-tab-body');
+    body.innerHTML = `<input type="text" id="nd-search-input" placeholder="Søg vare, fx havregryn"><div id="nd-search-results"></div>`;
+    document.getElementById('nd-search-input').addEventListener('input', (e) => {
+      clearTimeout(searchDebounce);
+      const q = e.target.value.trim();
+      if (q.length < 2) { document.getElementById('nd-search-results').innerHTML = ''; return; }
+      searchDebounce = setTimeout(() => doSearch(q), 450);
+    });
+    document.getElementById('nd-search-input').focus();
+  }
+
+  async function doSearch(q){
+    const results = document.getElementById('nd-search-results');
+    results.innerHTML = '<div class="hint">Søger...</div>';
+    try {
+      const url = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=20`;
+      const res = await fetch(url);
+      const data = await res.json();
+      const products = (data.products || []).filter(p => p.product_name && p.nutriments);
+      if (products.length === 0) { results.innerHTML = '<div class="empty">Ingen varer fundet.</div>'; return; }
+      results.innerHTML = '';
+      products.forEach(p => {
+        const kcal = p.nutriments['energy-kcal_100g'] ?? p.nutriments['energy-kcal'] ?? null;
+        const card = document.createElement('div');
+        card.className = 'prodcard';
+        card.innerHTML = `<div><div class="pname">${escapeHtml(p.product_name)}</div><div class="pbrand">${escapeHtml(p.brands || '')}</div></div>
+          <div class="pkcal mono">${kcal!==null ? Math.round(kcal)+' kcal/100g' : '?'}</div>`;
+        card.addEventListener('click', () => showQtyForm(offToProduct(p), { offerFavorite: true }));
+        results.appendChild(card);
+      });
+    } catch(e) {
+      results.innerHTML = '<div class="empty">Kunne ikke hente søgeresultater. Tjek din forbindelse.</div>';
+    }
+  }
+
+  function showScanTab(){
+    setActiveTab('scan');
+    const body = document.getElementById('nd-tab-body');
+    body.innerHTML = `<div class="hint">Ret kameraet mod stregkoden</div><div id="nd-scanbox"></div><div id="nd-scan-status" class="hint"></div>`;
+    startScanner();
+  }
+  function startScanner(){
+    stopScanner();
+    if (typeof Html5Qrcode === 'undefined') { document.getElementById('nd-scan-status').textContent = 'Scanner kunne ikke indlæses.'; return; }
+    scanner = new Html5Qrcode('nd-scanbox');
+    scanner.start(
+      { facingMode: 'environment' },
+      { fps: 10, qrbox: { width: 240, height: 140 }, formatsToSupport: [ Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.EAN_8, Html5QrcodeSupportedFormats.UPC_A, Html5QrcodeSupportedFormats.UPC_E ] },
+      (decodedText) => onBarcode(decodedText),
+      () => {}
+    ).catch(() => { const s = document.getElementById('nd-scan-status'); if (s) s.textContent = 'Kunne ikke få adgang til kameraet.'; });
+  }
+  function stopScanner(){
+    if (scanner) { scanner.stop().then(() => scanner.clear()).catch(() => {}); scanner = null; }
+  }
+  async function onBarcode(code){
+    stopScanner();
+    const status = document.getElementById('nd-scan-status');
+    if (status) status.textContent = 'Slår ' + code + ' op...';
+    try {
+      const res = await fetch(`https://world.openfoodfacts.org/api/v2/product/${code}.json`);
+      const data = await res.json();
+      if (data.status !== 1 || !data.product) { if (status) status.textContent = 'Varen blev ikke fundet. Prøv søgning eller indtast selv.'; return; }
+      showQtyForm(offToProduct(data.product), { offerFavorite: true });
+    } catch(e) { if (status) status.textContent = 'Opslag fejlede. Tjek din forbindelse.'; }
+  }
+
+  function showFavTab(){
+    stopScanner();
+    setActiveTab('fav');
+    const body = document.getElementById('nd-tab-body');
+    const hasAny = combos.length || favorites.length || recentFoods.length;
+    if (!hasAny) { body.innerHTML = '<div class="empty">Ingen genveje endnu. Gem en favorit, en kombination, eller log noget så dukker det op her.</div>'; return; }
+    body.innerHTML = '';
+
+    if (combos.length) {
+      const lbl = document.createElement('div');
+      lbl.className = 'section-lbl';
+      lbl.style.margin = '0 0 8px';
+      lbl.innerHTML = '<span>Kombinationer</span>';
+      body.appendChild(lbl);
+      combos.forEach(c => {
+        const totalKcal = c.items.reduce((a,i) => a + (i.kcal100 * i.qty/100), 0);
+        const card = document.createElement('div');
+        card.className = 'prodcard';
+        card.innerHTML = `<div><div class="pname">${escapeHtml(c.name)}</div><div class="pbrand">${c.items.length} varer</div></div>
+          <div class="pkcal mono">${Math.round(totalKcal)} kcal</div>
+          <button class="favdel" data-id="${c.id}" aria-label="Slet kombination">&times;</button>`;
+        card.addEventListener('click', (ev) => { if (ev.target.classList.contains('favdel')) return; openComboLogModal(c); });
+        card.querySelector('.favdel').addEventListener('click', async (ev) => {
+          ev.stopPropagation();
+          combos = combos.filter(x => x.id !== c.id);
+          await saveCombos();
+          showFavTab();
+        });
+        body.appendChild(card);
+      });
+    }
+
+    if (favorites.length) {
+      const lbl = document.createElement('div');
+      lbl.className = 'section-lbl';
+      lbl.style.margin = '18px 0 8px';
+      lbl.innerHTML = '<span>Favoritter</span>';
+      body.appendChild(lbl);
+      favorites.forEach(f => {
+        const card = document.createElement('div');
+        card.className = 'prodcard';
+        card.innerHTML = `<div><div class="pname">${escapeHtml(f.name)}</div><div class="pbrand">${escapeHtml(f.brand||'')}</div></div>
+          <div class="pkcal mono">${Math.round(f.kcal100)} kcal/100g</div>
+          <button class="favdel" data-id="${f.id}" aria-label="Slet favorit">&times;</button>`;
+        card.addEventListener('click', (ev) => {
+          if (ev.target.classList.contains('favdel')) return;
+          showQtyForm({ product_name: f.name, brands: f.brand, nutriments: { 'energy-kcal_100g': f.kcal100, proteins_100g: f.protein100, carbohydrates_100g: f.carbs100, fat_100g: f.fat100 } }, { offerFavorite: false });
+        });
+        card.querySelector('.favdel').addEventListener('click', async (ev) => {
+          ev.stopPropagation();
+          favorites = favorites.filter(x => x.id !== f.id);
+          await saveFavorites();
+          showFavTab();
+        });
+        body.appendChild(card);
+      });
+    }
+
+    if (recentFoods.length) {
+      const lbl = document.createElement('div');
+      lbl.className = 'section-lbl';
+      lbl.style.margin = '18px 0 8px';
+      lbl.innerHTML = '<span>Seneste</span>';
+      body.appendChild(lbl);
+      recentFoods.forEach((f, idx) => {
+        const card = document.createElement('div');
+        card.className = 'prodcard';
+        card.innerHTML = `<div><div class="pname">${escapeHtml(f.name)}</div><div class="pbrand">${escapeHtml(f.brand||'')}</div></div>
+          <div class="pkcal mono">${Math.round(f.kcal100)} kcal/100g</div>`;
+        card.addEventListener('click', () => {
+          showQtyForm({ product_name: f.name, brands: f.brand, nutriments: { 'energy-kcal_100g': f.kcal100, proteins_100g: f.protein100, carbohydrates_100g: f.carbs100, fat_100g: f.fat100 } }, { offerFavorite: true });
+        });
+        body.appendChild(card);
+      });
+    }
+  }
+
+  function comboItemGrams(i){
+    return i.unit === 'dl' ? i.qty * (i.gramsPerDl || 100) : i.qty;
+  }
+
+  function openComboLogModal(combo){
+    const totalKcal = combo.items.reduce((a,i) => a + (i.kcal100 * comboItemGrams(i)/100), 0);
+    const html = `
+      <div class="mhead"><div class="mtitle fr">${escapeHtml(combo.name)}</div><button class="mclose" id="nd-combo-close">&times;</button></div>
+      <div class="hint" style="text-align:left;">${combo.items.map(i => escapeHtml(i.name)).join(', ')}</div>
+      <div class="prodcard" style="cursor:default; margin:12px 0;">
+        <div><div class="pname">Samlet</div><div class="pbrand">${combo.items.length} varer</div></div>
+        <div class="pkcal mono">${Math.round(totalKcal)} kcal</div>
+      </div>
+      <label class="fieldlbl">Måltid</label>
+      <select id="nd-combo-meal">${MEALS.map(m => `<option value="${m.id}">${m.label}</option>`).join('')}</select>
+      <button class="btn" id="nd-combo-add" style="margin-top:10px">Tilføj alle til ${selectedDate === todayIso() ? 'i dag' : dateLabelFor(selectedDate)}</button>
+    `;
+    openModal(html);
+    document.getElementById('nd-combo-close').addEventListener('click', closeModal);
+    document.getElementById('nd-combo-meal').value = guessMeal();
+    document.getElementById('nd-combo-add').addEventListener('click', async () => {
+      const meal = document.getElementById('nd-combo-meal').value;
+      combo.items.forEach(i => {
+        const grams = comboItemGrams(i);
+        const f = grams/100;
+        entries.push({
+          id: 'e' + Date.now() + Math.random().toString(36).slice(2,6),
+          name: i.name, brand: i.brand, qty: i.qty, unit: i.unit || 'g', gramsPerDl: i.gramsPerDl || null, meal,
+          kcal100: i.kcal100, protein100: i.protein100, carbs100: i.carbs100, fat100: i.fat100,
+          kcal: i.kcal100*f, protein: i.protein100*f, carbs: i.carbs100*f, fat: i.fat100*f
+        });
+      });
+      await saveEntries();
+      renderToday();
+      closeModal();
+    });
+  }
+
+  function showManualTab(){
+    stopScanner();
+    setActiveTab('manual');
+    const body = document.getElementById('nd-tab-body');
+    body.innerHTML = `
+      <label class="fieldlbl">Navn</label>
+      <input type="text" id="nd-man-name" placeholder="fx Hjemmelavet suppe">
+      <label class="fieldlbl">Mærke (valgfrit)</label>
+      <input type="text" id="nd-man-brand" placeholder="fx eget mærke">
+      <div class="goalgrid">
+        <div><label class="fieldlbl">Kcal / 100g</label><input type="number" id="nd-man-kcal" placeholder="0"></div>
+        <div><label class="fieldlbl">Protein / 100g</label><input type="number" id="nd-man-protein" placeholder="0"></div>
+        <div><label class="fieldlbl">Kulhydrat / 100g</label><input type="number" id="nd-man-carbs" placeholder="0"></div>
+        <div><label class="fieldlbl">Fedt / 100g</label><input type="number" id="nd-man-fat" placeholder="0"></div>
+      </div>
+      <div id="nd-man-err" style="font-size:12px; color: var(--red); display:none; margin-bottom:8px;"></div>
+      <button class="btn" id="nd-man-next" style="margin-top:6px">Næste</button>
+    `;
+    document.getElementById('nd-man-next').addEventListener('click', () => {
+      const name = document.getElementById('nd-man-name').value.trim();
+      const err = document.getElementById('nd-man-err');
+      if (!name) { err.textContent = 'Indtast et navn.'; err.style.display = 'block'; return; }
+      err.style.display = 'none';
+      const brand = document.getElementById('nd-man-brand').value.trim();
+      const kcal = Number(document.getElementById('nd-man-kcal').value) || 0;
+      const protein = Number(document.getElementById('nd-man-protein').value) || 0;
+      const carbs = Number(document.getElementById('nd-man-carbs').value) || 0;
+      const fat = Number(document.getElementById('nd-man-fat').value) || 0;
+      showQtyForm({ product_name: name, brands: brand, nutriments: { 'energy-kcal_100g': kcal, proteins_100g: protein, carbohydrates_100g: carbs, fat_100g: fat } }, { offerFavorite: true });
+    });
+  }
+
+  function offToProduct(p){ return p; }
+  function per100(p, key){ const n = p.nutriments || {}; return n[key+'_100g'] ?? n[key] ?? 0; }
+
+  function showQtyForm(p, opts){
+    opts = opts || {};
+    const name = p.product_name || 'Ukendt vare';
+    const brand = p.brands || '';
+    const kcal100 = per100(p, 'energy-kcal');
+    const protein100 = per100(p, 'proteins');
+    const carbs100 = per100(p, 'carbohydrates');
+    const fat100 = per100(p, 'fat');
+
+    const body = document.getElementById('nd-tab-body');
+    body.innerHTML = `
+      <div class="prodcard" style="cursor:default; margin-bottom:14px;">
+        <div><div class="pname">${escapeHtml(name)}</div><div class="pbrand">${escapeHtml(brand)}</div></div>
+      </div>
+      <label class="fieldlbl">Mængde</label>
+      <div style="display:flex; gap:8px;">
+        <input type="number" id="nd-qty" value="100" min="0" style="flex:1; margin-bottom:0;">
+        <select id="nd-qty-unit" style="width:auto; flex:0 0 70px; margin-bottom:0;">
+          <option value="g">gram</option>
+          <option value="dl">dl</option>
+        </select>
+      </div>
+      <div id="nd-qty-density-wrap" style="display:none; margin-top:10px;">
+        <label class="fieldlbl">Gram pr. dl</label>
+        <input type="number" id="nd-qty-density" value="100" min="1">
+        <div class="hint" style="text-align:left; margin-top:-4px;">Tjek evt. varens emballage – fx mælk ≈ 103 g/dl, havregryn ≈ 40 g/dl.</div>
+      </div>
+      <label class="fieldlbl">Måltid</label>
+      <select id="nd-qty-meal">${MEALS.map(m => `<option value="${m.id}">${m.label}</option>`).join('')}</select>
+      <div id="nd-qty-preview" class="hint" style="text-align:left; margin-top:2px;"></div>
+      ${opts.offerFavorite ? '<label class="chk"><input type="checkbox" id="nd-qty-fav"> Gem som favorit</label>' : ''}
+      <button class="btn" id="nd-qty-add" style="margin-top:10px">Tilføj til i dag</button>
+    `;
+    document.getElementById('nd-qty-meal').value = guessMeal();
+    const getGrams = () => {
+      const qty = Number(document.getElementById('nd-qty').value) || 0;
+      const unit = document.getElementById('nd-qty-unit').value;
+      if (unit === 'dl') {
+        const gpd = Number(document.getElementById('nd-qty-density').value) || 100;
+        return qty * gpd;
+      }
+      return qty;
+    };
+    const preview = () => {
+      const grams = getGrams();
+      const f = grams/100;
+      document.getElementById('nd-qty-preview').textContent = `${Math.round(kcal100*f)} kcal · P${fmt(protein100*f)}g K${fmt(carbs100*f)}g F${fmt(fat100*f)}g`;
+    };
+    document.getElementById('nd-qty').addEventListener('input', preview);
+    document.getElementById('nd-qty-density').addEventListener('input', preview);
+    document.getElementById('nd-qty-unit').addEventListener('change', (e) => {
+      document.getElementById('nd-qty-density-wrap').style.display = e.target.value === 'dl' ? 'block' : 'none';
+      preview();
+    });
+    preview();
+    document.getElementById('nd-qty-add').addEventListener('click', async () => {
+      const qty = Number(document.getElementById('nd-qty').value) || 0;
+      const unit = document.getElementById('nd-qty-unit').value;
+      const gramsPerDl = unit === 'dl' ? (Number(document.getElementById('nd-qty-density').value) || 100) : null;
+      const grams = getGrams();
+      const f = grams/100;
+      const meal = document.getElementById('nd-qty-meal').value;
+      entries.push({
+        id: 'e' + Date.now(),
+        name, brand, qty, unit, gramsPerDl, meal,
+        kcal100, protein100, carbs100, fat100,
+        kcal: kcal100*f, protein: protein100*f, carbs: carbs100*f, fat: fat100*f
+      });
+      await saveEntries();
+      await addToRecent({ name, brand, kcal100, protein100, carbs100, fat100 });
+      if (opts.offerFavorite && document.getElementById('nd-qty-fav') && document.getElementById('nd-qty-fav').checked) {
+        favorites.push({ id: 'f' + Date.now(), name, brand, kcal100, protein100, carbs100, fat100 });
+        await saveFavorites();
+      }
+      renderToday();
+      closeModal();
+    });
+  }
+
+  function openEditEntry(e){
+    const html = `
+      <div class="mhead"><div class="mtitle fr">Rediger vare</div><button class="mclose" id="nd-eclose">&times;</button></div>
+      <div class="prodcard" style="cursor:default; margin-bottom:14px;">
+        <div><div class="pname">${escapeHtml(e.name)}</div><div class="pbrand">${escapeHtml(e.brand||'')}</div></div>
+      </div>
+      <label class="fieldlbl">Mængde</label>
+      <div style="display:flex; gap:8px;">
+        <input type="number" id="nd-edit-qty" value="${e.qty}" min="0" style="flex:1; margin-bottom:0;">
+        <select id="nd-edit-unit" style="width:auto; flex:0 0 70px; margin-bottom:0;">
+          <option value="g">gram</option>
+          <option value="dl">dl</option>
+        </select>
+      </div>
+      <div id="nd-edit-density-wrap" style="display:none; margin-top:10px;">
+        <label class="fieldlbl">Gram pr. dl</label>
+        <input type="number" id="nd-edit-density" value="${e.gramsPerDl || 100}" min="1">
+      </div>
+      <label class="fieldlbl">Måltid</label>
+      <select id="nd-edit-meal">${MEALS.map(m => `<option value="${m.id}">${m.label}</option>`).join('')}</select>
+      <div id="nd-edit-preview" class="hint" style="text-align:left; margin-top:2px;"></div>
+      <div class="btnrow">
+        <button class="btn danger" id="nd-edit-del">Slet</button>
+        <button class="btn" id="nd-edit-save">Gem ændringer</button>
+      </div>
+    `;
+    openModal(html);
+    document.getElementById('nd-eclose').addEventListener('click', closeModal);
+    document.getElementById('nd-edit-meal').value = e.meal || 'other';
+    document.getElementById('nd-edit-unit').value = e.unit === 'dl' ? 'dl' : 'g';
+    document.getElementById('nd-edit-density-wrap').style.display = e.unit === 'dl' ? 'block' : 'none';
+    const kcal100 = e.kcal100 ?? (e.kcal / (e.qty/100));
+    const protein100 = e.protein100 ?? (e.protein / (e.qty/100));
+    const carbs100 = e.carbs100 ?? (e.carbs / (e.qty/100));
+    const fat100 = e.fat100 ?? (e.fat / (e.qty/100));
+    const getGrams = () => {
+      const qty = Number(document.getElementById('nd-edit-qty').value) || 0;
+      const unit = document.getElementById('nd-edit-unit').value;
+      if (unit === 'dl') {
+        const gpd = Number(document.getElementById('nd-edit-density').value) || 100;
+        return qty * gpd;
+      }
+      return qty;
+    };
+    const preview = () => {
+      const grams = getGrams();
+      const f = grams/100;
+      document.getElementById('nd-edit-preview').textContent = `${Math.round(kcal100*f)} kcal · P${fmt(protein100*f)}g K${fmt(carbs100*f)}g F${fmt(fat100*f)}g`;
+    };
+    document.getElementById('nd-edit-qty').addEventListener('input', preview);
+    document.getElementById('nd-edit-density').addEventListener('input', preview);
+    document.getElementById('nd-edit-unit').addEventListener('change', (ev) => {
+      document.getElementById('nd-edit-density-wrap').style.display = ev.target.value === 'dl' ? 'block' : 'none';
+      preview();
+    });
+    preview();
+    document.getElementById('nd-edit-del').addEventListener('click', async () => {
+      entries = entries.filter(x => x.id !== e.id);
+      await saveEntries();
+      renderToday();
+      closeModal();
+    });
+    document.getElementById('nd-edit-save').addEventListener('click', async () => {
+      const qty = Number(document.getElementById('nd-edit-qty').value) || 0;
+      const unit = document.getElementById('nd-edit-unit').value;
+      const gramsPerDl = unit === 'dl' ? (Number(document.getElementById('nd-edit-density').value) || 100) : null;
+      const grams = getGrams();
+      const f = grams/100;
+      const meal = document.getElementById('nd-edit-meal').value;
+      entries = entries.map(x => x.id === e.id ? {
+        ...x, qty, unit, gramsPerDl, meal, kcal100, protein100, carbs100, fat100,
+        kcal: kcal100*f, protein: protein100*f, carbs: carbs100*f, fat: fat100*f
+      } : x);
+      await saveEntries();
+      renderToday();
+      closeModal();
+    });
+  }
+
+  let currentRange = '7';
+  document.getElementById('nd-ov-range').addEventListener('change', (e) => {
+    currentRange = e.target.value;
+    renderOverview(currentRange);
+  });
+
+  async function renderOverview(rangeVal){
+    const body = document.getElementById('nd-ov-body');
+    body.innerHTML = '<div class="hint">Henter data...</div>';
+    const diaryMap = await gatherAllDiary();
+    const loggedDates = Object.keys(diaryMap).sort();
+    const exerciseMap = await gatherAllExercise();
+
+    let startDate;
+    if (rangeVal === 'all') {
+      if (loggedDates.length === 0) {
+        body.innerHTML = '<div class="empty">Ingen logninger endnu.</div>';
+        return;
+      }
+      startDate = new Date(loggedDates[0] + 'T00:00:00');
+    } else {
+      const days = Number(rangeVal);
+      startDate = new Date();
+      startDate.setDate(startDate.getDate() - (days - 1));
+    }
+    const today = new Date();
+    const dates = [];
+    for (let d = new Date(startDate); d <= today; d.setDate(d.getDate()+1)) {
+      dates.push(isoDate(d));
+    }
+    const dayTotals = dates.map(dstr => {
+      const list = diaryMap[dstr] || [];
+      return { date: dstr, sums: sumEntries(list), logged: list.length > 0, skipped: !!skipDays[dstr] };
+    });
+
+    const trackedDays = dayTotals.filter(d => !d.skipped);
+    const skippedCount = dayTotals.length - trackedDays.length;
+    const loggedDays = trackedDays.filter(d => d.logged);
+    const avg = key => loggedDays.length ? Math.round(loggedDays.reduce((a,d)=>a+d.sums[key],0)/loggedDays.length) : 0;
+
+    const exDaysCount = dates.filter(d => (exerciseMap[d] || []).length > 0).length;
+    const exAgg = aggregateExercise(exerciseMap, dates);
+
+    let bucketSize = 1;
+    if (dayTotals.length > 180) bucketSize = 14;
+    else if (dayTotals.length > 31) bucketSize = 7;
+
+    const buckets = [];
+    for (let i = 0; i < dayTotals.length; i += bucketSize) {
+      const chunk = dayTotals.slice(i, i+bucketSize);
+      const loggedChunk = chunk.filter(d => d.logged);
+      const avgKcal = loggedChunk.length ? loggedChunk.reduce((a,d)=>a+d.sums.kcal,0)/loggedChunk.length : 0;
+      buckets.push({ startDate: chunk[0].date, endDate: chunk[chunk.length-1].date, kcal: avgKcal, hasData: loggedChunk.length > 0 });
+    }
+
+    const maxKcal = Math.max(goals.kcal, ...buckets.map(b => b.kcal), 1);
+    const barW = buckets.length <= 7 ? 34 : buckets.length <= 31 ? 8 : buckets.length <= 60 ? 5 : 3;
+    const gap = buckets.length <= 7 ? 10 : buckets.length <= 31 ? 2 : 1;
+    const chartW = buckets.length * (barW+gap);
+    const chartH = 140;
+    const cs = getComputedStyle(app);
+    let bars = '';
+    buckets.forEach((b, i) => {
+      const h = b.hasData ? Math.max(2, (b.kcal / maxKcal) * chartH) : 1;
+      const x = i * (barW+gap);
+      const over = b.kcal > goals.kcal;
+      const color = !b.hasData ? cs.getPropertyValue('--line').trim() : (over ? cs.getPropertyValue('--coral').trim() : cs.getPropertyValue('--lime').trim());
+      let titleTag = '';
+      if (bucketSize === 1) {
+        const note = notes[b.startDate];
+        if (note && (note.tags.length || note.text)) {
+          const tipText = [note.tags.join(', '), note.text].filter(Boolean).join(' — ');
+          titleTag = `<title>${escapeHtml(shortDate(b.startDate))}: ${escapeHtml(tipText)}</title>`;
+        }
+      }
+      bars += `<rect x="${x}" y="${chartH-h}" width="${barW}" height="${h}" rx="2" fill="${color}">${titleTag}</rect>`;
+      if (bucketSize === 1 && notes[b.startDate] && (notes[b.startDate].tags.length || notes[b.startDate].text)) {
+        const dotY = Math.max(4, chartH-h-7);
+        bars += `<circle cx="${x+barW/2}" cy="${dotY}" r="2.5" fill="${cs.getPropertyValue('--sand').trim()}"></circle>`;
+      }
+      if (bucketSize === 1 && skipDays[b.startDate]) {
+        const skY = Math.max(4, chartH-h-7);
+        bars += `<rect x="${x+barW/2-2.5}" y="${skY-2.5}" width="5" height="5" fill="${cs.getPropertyValue('--text-lo').trim()}"></rect>`;
+      }
+    });
+    const goalY = chartH - Math.min(chartH, (goals.kcal/maxKcal)*chartH);
+
+    const shortDate = ds => new Date(ds+'T00:00:00').toLocaleDateString('da-DK', {day:'numeric', month:'short'});
+    let labels = '';
+    if (bucketSize === 1 && buckets.length === 7) {
+      labels = buckets.map((b,i) => `<text x="${i*(barW+gap)+barW/2}" y="${chartH+16}" text-anchor="middle" font-size="10" fill="${cs.getPropertyValue('--text-lo').trim()}">${new Date(b.startDate+'T00:00:00').toLocaleDateString('da-DK', {weekday:'short'})}</text>`).join('');
+    } else {
+      const idxs = new Set([0, Math.floor(buckets.length/2), buckets.length-1]);
+      labels = buckets.map((b,i) => idxs.has(i) ? `<text x="${i*(barW+gap)+barW/2}" y="${chartH+16}" text-anchor="middle" font-size="10" fill="${cs.getPropertyValue('--text-lo').trim()}">${shortDate(b.startDate)}</text>` : '').join('');
+    }
+
+    const mealAvgs = aggregateMealAverages(dayTotals, diaryMap);
+    const mealMax = Math.max(...mealAvgs.map(m => m.avg), 1);
+    const mealHtml = mealAvgs.length ? `
+      <div class="section-lbl" style="margin-top:22px;"><span>Kalorier pr. måltid (gns.)</span></div>
+      ${mealAvgs.map((m,i) => `
+        <div class="goalrow" style="cursor:default;">
+          <div class="ghead">
+            <div class="gname">${escapeHtml(m.label)}</div>
+            <div class="gstat">${m.avg} kcal &middot; ${m.days} ${m.days===1?'dag':'dage'}</div>
+          </div>
+          <div class="gtrack"><div class="gfill" style="width:${(m.avg/mealMax)*100}%; background:${i===0 ? cs.getPropertyValue('--coral').trim() : cs.getPropertyValue('--lime').trim()};"></div></div>
+        </div>
+      `).join('')}
+      <div class="hint" style="text-align:left; margin-top:2px;">Sorteret efter størst gennemsnit. Gennemsnittet er regnet ud fra de dage, hvor du faktisk har logget det måltid.</div>
+    ` : '';
+
+    const insights = computeTagInsights(dayTotals);
+    const insightHtml = insights.length ? `
+      <div class="section-lbl" style="margin-top:22px;"><span>Sammenhæng med noter</span></div>
+      ${insights.map(ins => `
+        <div class="entry" style="cursor:default;">
+          <div><div class="name">${escapeHtml(ins.tag)}</div><div class="sub">${ins.count} ${ins.count===1?'dag':'dage'} · gns ${ins.avg} kcal</div></div>
+          <div class="kcal mono" style="color: ${ins.diff>0 ? cs.getPropertyValue('--coral').trim() : cs.getPropertyValue('--sage').trim()};">${ins.diff>0?'+':''}${ins.diff}</div>
+        </div>
+      `).join('')}
+      <div class="hint" style="text-align:left; margin-top:4px;">Tallet til højre viser forskellen fra gennemsnittet på dage uden den note.</div>
+    ` : '';
+
+    const exerciseHtml = exAgg.length ? `
+      <div class="section-lbl" style="margin-top:22px;"><span>Træning i perioden</span></div>
+      ${exAgg.map(a => `
+        <div class="entry" style="cursor:default;">
+          <div><div class="name">${escapeHtml(a.activity)}</div><div class="sub">${a.count} ${a.count===1?'gang':'gange'}${a.minutes ? ' · '+a.minutes+' min' : ''}${a.distanceLabel ? ' · '+a.distanceLabel : ''}</div></div>
+        </div>
+      `).join('')}
+    ` : '';
+
+    body.innerHTML = `
+      <div class="statgrid">
+        <div class="statcard"><div class="lbl">Gns. kalorier/dag</div><div class="val">${avg('kcal')}</div></div>
+        <div class="statcard"><div class="lbl">Dage logget</div><div class="val">${loggedDays.length}/${trackedDays.length}</div></div>
+        <div class="statcard"><div class="lbl">Gns. protein</div><div class="val">${avg('protein')}g</div></div>
+        <div class="statcard"><div class="lbl">Gns. fedt</div><div class="val">${avg('fat')}g</div></div>
+        <div class="statcard"><div class="lbl">Træningsdage</div><div class="val">${exDaysCount}/${dayTotals.length}</div></div>
+      </div>
+      <div class="section-lbl"><span>Kalorier ${bucketSize===1 ? 'pr. dag' : 'pr. periode (gns/dag)'}</span></div>
+      <div style="overflow-x:auto;">
+        <svg width="${chartW}" height="${chartH+22}" viewBox="0 0 ${chartW} ${chartH+22}">
+          <line x1="0" y1="${goalY}" x2="${chartW}" y2="${goalY}" stroke="${cs.getPropertyValue('--text-lo').trim()}" stroke-width="1" stroke-dasharray="3 3"></line>
+          ${bars}
+          ${labels}
+        </svg>
+      </div>
+      <div class="hint" style="text-align:left; margin-top:8px;">Stiplet linje = dit kaloriemål. Orange = over målet.${skippedCount ? ` ${skippedCount} ${skippedCount===1?'dag er':'dage er'} markeret som ikke sporet og tæller ikke med.` : ''} ${bucketSize===1 ? 'Prikken over en søjle betyder, at dagen har en note; en firkant betyder ikke sporet.' : 'Hver søjle er gennemsnittet for en periode på '+bucketSize+' dage.'}</div>
+      ${mealHtml}
+      ${insightHtml}
+      ${exerciseHtml}
+    `;
+  }
+
+  function aggregateMealAverages(dayTotals, diaryMap){
+    const mealSums = {};
+    dayTotals.forEach(d => {
+      if (d.skipped) return;
+      const list = diaryMap[d.date] || [];
+      if (list.length === 0) return;
+      const seenMeals = new Set();
+      list.forEach(e => {
+        const meal = e.meal || 'other';
+        if (!mealSums[meal]) mealSums[meal] = { sum: 0, days: 0 };
+        mealSums[meal].sum += e.kcal;
+        if (!seenMeals.has(meal)) { mealSums[meal].days += 1; seenMeals.add(meal); }
+      });
+    });
+    return MEALS.map(m => {
+      const s = mealSums[m.id];
+      return s ? { id: m.id, label: m.label, avg: Math.round(s.sum/s.days), days: s.days } : null;
+    }).filter(Boolean).sort((a,b) => b.avg - a.avg);
+  }
+
+  function aggregateExercise(exerciseMap, dates){
+    const byActivity = {};
+    dates.forEach(dstr => {
+      const list = exerciseMap[dstr] || [];
+      list.forEach(e => {
+        if (!byActivity[e.activity]) byActivity[e.activity] = { count: 0, minutes: 0, distances: {} };
+        byActivity[e.activity].count += 1;
+        if (e.duration_min) byActivity[e.activity].minutes += e.duration_min;
+        if (e.distance_value) {
+          const u = e.distance_unit || 'km';
+          byActivity[e.activity].distances[u] = (byActivity[e.activity].distances[u] || 0) + e.distance_value;
+        }
+      });
+    });
+    return Object.keys(byActivity).map(a => {
+      const d = byActivity[a];
+      const distanceLabel = Object.keys(d.distances).map(u => `${fmt(d.distances[u])} ${u}`).join(' + ');
+      return { activity: a, count: d.count, minutes: Math.round(d.minutes), distanceLabel };
+    }).sort((a,b) => b.count - a.count);
+  }
+
+  function computeTagInsights(dayTotals){
+    const tagStats = {};
+    dayTotals.forEach(d => {
+      if (!d.logged) return;
+      const note = notes[d.date];
+      if (!note || !note.tags || note.tags.length === 0) return;
+      note.tags.forEach(t => {
+        if (!tagStats[t]) tagStats[t] = { sum: 0, count: 0 };
+        tagStats[t].sum += d.sums.kcal;
+        tagStats[t].count += 1;
+      });
+    });
+    const loggedDays = dayTotals.filter(d => d.logged);
+    return Object.keys(tagStats).map(t => {
+      const withTag = tagStats[t];
+      const withoutSum = loggedDays.filter(d => !(notes[d.date] && notes[d.date].tags && notes[d.date].tags.includes(t))).reduce((a,d)=>a+d.sums.kcal,0);
+      const withoutCount = loggedDays.length - withTag.count;
+      const withoutAvg = withoutCount > 0 ? withoutSum/withoutCount : withTag.sum/withTag.count;
+      const avg = withTag.sum/withTag.count;
+      return { tag: t, count: withTag.count, avg: Math.round(avg), diff: Math.round(avg - withoutAvg) };
+    }).sort((a,b) => b.count - a.count);
+  }
+
+  async function renderWeightScreen(){
+    document.getElementById('nd-weight-date').value = editingWeightDate || todayIso();
+    document.getElementById('nd-weight-val').value = weights[editingWeightDate || todayIso()] ?? '';
+    document.getElementById('nd-weight-reset').style.display = editingWeightDate ? 'block' : 'none';
+
+    const sortedDates = Object.keys(weights).sort();
+    const chartWrap = document.getElementById('nd-weight-chart-wrap');
+    if (sortedDates.length < 2) {
+      chartWrap.innerHTML = '<div class="hint" style="margin-top:14px;">Log mindst to vejninger for at se udviklingen.</div>';
+    } else {
+      const cs = getComputedStyle(app);
+      const vals = sortedDates.map(d => weights[d]);
+      let minV = Math.min(...vals), maxV = Math.max(...vals);
+      const hasGoal = weightGoal !== null && !isNaN(weightGoal);
+      if (hasGoal) { minV = Math.min(minV, weightGoal-2); maxV = Math.max(maxV, weightGoal+2); }
+      const pad = Math.max((maxV-minV)*0.12, 0.3);
+      const yMin = minV-pad, yMax = maxV+pad;
+      const w = 360, h = 130;
+      const toY = v => h - ((v-yMin)/(yMax-yMin))*h;
+      const pts = sortedDates.map((d,i) => {
+        const x = sortedDates.length === 1 ? 0 : (i/(sortedDates.length-1))*w;
+        return [x, toY(weights[d])];
+      });
+      const path = pts.map((p,i) => (i===0?'M':'L')+p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ');
+      const dots = pts.map(p => `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="3" fill="${cs.getPropertyValue('--lime').trim()}"></circle>`).join('');
+
+      let bands = '';
+      let diffLabel = '';
+      if (hasGoal) {
+        const clamp = y => Math.max(0, Math.min(h, y));
+        const y2top = clamp(toY(weightGoal+2)), y2bot = clamp(toY(weightGoal-2));
+        const y1top = clamp(toY(weightGoal+1)), y1bot = clamp(toY(weightGoal-1));
+        bands = `
+          <rect x="0" y="${y2top}" width="${w}" height="${Math.max(0,y2bot-y2top)}" fill="rgba(232,193,95,0.20)"></rect>
+          <rect x="0" y="${y1top}" width="${w}" height="${Math.max(0,y1bot-y1top)}" fill="rgba(111,176,126,0.32)"></rect>
+          <line x1="0" y1="${toY(weightGoal)}" x2="${w}" y2="${toY(weightGoal)}" stroke="${cs.getPropertyValue('--text-hi').trim()}" stroke-width="1" stroke-dasharray="3 3" opacity="0.4"></line>
+        `;
+        const diff = vals[vals.length-1] - weightGoal;
+        const absDiff = Math.abs(diff);
+        const diffColor = absDiff <= 1 ? cs.getPropertyValue('--sage').trim() : absDiff <= 2 ? cs.getPropertyValue('--sand').trim() : cs.getPropertyValue('--text-mid').trim();
+        diffLabel = `<span class="kc mono" style="color:${diffColor};">${diff>0?'+':''}${fmt(diff)} kg fra mål</span>`;
+      }
+
+      const diaryMap = await gatherAllDiary();
+      const kcalAvgByDate = {};
+      sortedDates.forEach(d => {
+        const idx = dates => dates;
+        const end = new Date(d+'T00:00:00');
+        let sum = 0, count = 0;
+        for (let i = 0; i < 7; i++) {
+          const dd = new Date(end); dd.setDate(dd.getDate()-i);
+          const ds = isoDate(dd);
+          const list = diaryMap[ds];
+          if (list && list.length) { sum += sumEntries(list).kcal; count++; }
+        }
+        kcalAvgByDate[d] = count > 0 ? sum/count : null;
+      });
+      const kcalVals = sortedDates.map(d => kcalAvgByDate[d]).filter(v => v !== null);
+      let kcalPath = '';
+      if (kcalVals.length >= 2) {
+        const kMin = Math.min(...kcalVals), kMax = Math.max(...kcalVals);
+        const kPad = Math.max((kMax-kMin)*0.15, 20);
+        const kYMin = kMin-kPad, kYMax = kMax+kPad;
+        const kToY = v => h - ((v-kYMin)/Math.max(kYMax-kYMin,1))*h;
+        let segStr = '';
+        let started = false;
+        sortedDates.forEach((d,i) => {
+          const v = kcalAvgByDate[d];
+          const x = sortedDates.length === 1 ? 0 : (i/(sortedDates.length-1))*w;
+          if (v === null) { started = false; return; }
+          segStr += (started ? 'L' : 'M') + x.toFixed(1) + ',' + kToY(v).toFixed(1) + ' ';
+          started = true;
+        });
+        kcalPath = `<path d="${segStr.trim()}" fill="none" stroke="${cs.getPropertyValue('--coral').trim()}" stroke-width="1.5" stroke-dasharray="4 3" opacity="0.85"></path>`;
+      }
+
+      chartWrap.innerHTML = `
+        <div class="section-lbl" style="margin-top:16px;"><span>Udvikling</span>${diffLabel || `<span class="kc mono">${fmt(vals[vals.length-1])} kg</span>`}</div>
+        <svg width="100%" height="${h+10}" viewBox="0 0 ${w} ${h+10}" preserveAspectRatio="none">
+          ${bands}
+          ${kcalPath}
+          <path d="${path}" fill="none" stroke="${cs.getPropertyValue('--lime').trim()}" stroke-width="2"></path>
+          ${dots}
+        </svg>
+        <div style="display:flex; gap:14px; margin-top:6px;">
+          <span style="font-size:11px; color:var(--text-mid); display:flex; align-items:center; gap:5px;"><span style="width:10px; height:2px; background:var(--lime); display:inline-block;"></span>Vægt</span>
+          ${kcalPath ? `<span style="font-size:11px; color:var(--text-mid); display:flex; align-items:center; gap:5px;"><span style="width:10px; height:2px; background:var(--coral); display:inline-block;"></span>Kalorier (7-dages snit)</span>` : ''}
+        </div>
+      `;
+
+      const etaEl = document.getElementById('nd-weight-eta');
+      if (etaEl) {
+        const currentDiff = Math.abs(vals[vals.length-1] - weightGoal);
+        if (hasGoal && currentDiff <= 1) {
+          etaEl.textContent = 'Du holder dig indenfor din målvægt – flot!';
+          etaEl.style.color = cs.getPropertyValue('--sage').trim();
+          etaEl.style.display = 'block';
+        } else if (hasGoal) {
+          etaEl.style.color = '';
+          const eta = estimateGoalETA(sortedDates);
+          if (eta && eta.status === 'ok') {
+            const dateStr = eta.date.toLocaleDateString('da-DK', { day:'numeric', month:'long' });
+            const weeks = Math.round(eta.days/7);
+            etaEl.textContent = `Ved nuværende tendens: målet nås ca. ${dateStr} (om ~${weeks} ${weeks===1?'uge':'uger'}).`;
+            etaEl.style.display = 'block';
+          } else if (eta && eta.status === 'wrong_direction') {
+            etaEl.textContent = 'Din nuværende tendens bevæger dig væk fra målet.';
+            etaEl.style.display = 'block';
+          } else if (eta && eta.status === 'flat') {
+            etaEl.textContent = 'Din vægt har været stabil for nylig – svært at estimere en dato.';
+            etaEl.style.display = 'block';
+          } else {
+            etaEl.style.display = 'none';
+          }
+        } else {
+          etaEl.style.display = 'none';
+        }
+      }
+    }
+
+    const listEl = document.getElementById('nd-weight-list');
+    if (sortedDates.length === 0) {
+      listEl.innerHTML = '<div class="empty">Ingen vejninger endnu.</div>';
+    } else {
+      listEl.innerHTML = '';
+      sortedDates.slice().reverse().forEach(d => {
+        const row = document.createElement('div');
+        row.className = 'weightrow';
+        row.innerHTML = `<div class="wd">${dateLabelFor(d)}</div><div class="wv">${fmt(weights[d])} kg</div>`;
+        row.addEventListener('click', () => { editingWeightDate = d; renderWeightScreen(); });
+        listEl.appendChild(row);
+      });
+    }
+  }
+
+  function estimateGoalETA(sortedDates){
+    if (!weightGoal || sortedDates.length < 3) return null;
+    const t0 = new Date(sortedDates[0]+'T00:00:00');
+    const allPts = sortedDates.map(d => ({ x: (new Date(d+'T00:00:00')-t0)/86400000, y: weights[d] }));
+    const recent = allPts.slice(-8);
+    const n = recent.length;
+    const sumX = recent.reduce((a,p)=>a+p.x,0);
+    const sumY = recent.reduce((a,p)=>a+p.y,0);
+    const sumXY = recent.reduce((a,p)=>a+p.x*p.y,0);
+    const sumXX = recent.reduce((a,p)=>a+p.x*p.x,0);
+    const denom = (n*sumXX - sumX*sumX);
+    if (denom === 0) return null;
+    const slope = (n*sumXY - sumX*sumY)/denom;
+    const lastVal = weights[sortedDates[sortedDates.length-1]];
+    const diff = weightGoal - lastVal;
+    if (Math.abs(diff) < 0.05) return { status: 'ok', days: 0, date: new Date() };
+    if (Math.abs(slope) < 0.01) return { status: 'flat' };
+    if ((diff > 0 && slope <= 0) || (diff < 0 && slope >= 0)) return { status: 'wrong_direction' };
+    const daysNeeded = diff/slope;
+    if (daysNeeded < 0 || daysNeeded > 3650) return { status: 'unclear' };
+    const etaDate = new Date();
+    etaDate.setDate(etaDate.getDate()+Math.round(daysNeeded));
+    return { status: 'ok', days: Math.round(daysNeeded), date: etaDate };
+  }
+  document.getElementById('nd-weight-date').addEventListener('change', (e) => {
+    editingWeightDate = e.target.value === todayIso() ? null : e.target.value;
+  });
+  document.getElementById('nd-weight-goal-save').addEventListener('click', async () => {
+    const val = Number(document.getElementById('nd-weight-goal').value);
+    weightGoal = (val && val > 0) ? val : null;
+    await saveWeightGoal();
+    const status = document.getElementById('nd-weight-goal-status');
+    status.textContent = weightGoal !== null ? 'Målvægt gemt.' : 'Målvægt fjernet.';
+    setTimeout(() => status.textContent = '', 1800);
+    renderGoalsForm();
+  });
+  document.getElementById('nd-weight-save').addEventListener('click', async () => {
+    const dateStr = document.getElementById('nd-weight-date').value || todayIso();
+    const val = Number(document.getElementById('nd-weight-val').value);
+    if (!val || val <= 0) return;
+    weights[dateStr] = val;
+    await saveWeights();
+    editingWeightDate = null;
+    renderWeightScreen();
+  });
+  document.getElementById('nd-weight-reset').addEventListener('click', () => {
+    editingWeightDate = null;
+    renderWeightScreen();
+  });
+
+  async function gatherAllDiary(){
+    const diary = {};
+    try {
+      const listed = await window.storage.list('nd_diary_', false);
+      const keys = (listed && listed.keys) ? listed.keys : [];
+      await Promise.all(keys.map(async (k) => {
+        try {
+          const r = await window.storage.get(k, false);
+          if (r && r.value) diary[k.replace('nd_diary_','')] = JSON.parse(r.value);
+        } catch(e) {}
+      }));
+    } catch(e) {}
+    return diary;
+  }
+
+  async function gatherAllExercise(){
+    const map = {};
+    try {
+      const listed = await window.storage.list('nd_exercise_', false);
+      const keys = (listed && listed.keys) ? listed.keys : [];
+      await Promise.all(keys.map(async (k) => {
+        try {
+          const r = await window.storage.get(k, false);
+          if (r && r.value) map[k.replace('nd_exercise_','')] = JSON.parse(r.value);
+        } catch(e) {}
+      }));
+    } catch(e) {}
+    return map;
+  }
+
+  async function gatherAllWeekGoals(){
+    const map = {};
+    try {
+      const listed = await window.storage.list('nd_weekgoals_', false);
+      const keys = (listed && listed.keys) ? listed.keys : [];
+      await Promise.all(keys.map(async (k) => {
+        try {
+          const r = await window.storage.get(k, false);
+          if (r && r.value) map[k.replace('nd_weekgoals_','')] = JSON.parse(r.value);
+        } catch(e) {}
+      }));
+    } catch(e) {}
+    return map;
+  }
+
+  document.getElementById('nd-bulkskip-apply').addEventListener('click', async () => {
+    const fromVal = document.getElementById('nd-bulkskip-from').value;
+    const toVal = document.getElementById('nd-bulkskip-to').value;
+    const status = document.getElementById('nd-bulkskip-status');
+    if (!fromVal || !toVal) { status.style.color = 'var(--red)'; status.textContent = 'Vælg både fra- og til-dato.'; return; }
+    if (fromVal > toVal) { status.style.color = 'var(--red)'; status.textContent = 'Fra-dato skal være før til-dato.'; return; }
+    let d = new Date(fromVal+'T00:00:00');
+    const end = new Date(toVal+'T00:00:00');
+    let count = 0;
+    while (d <= end) { skipDays[isoDate(d)] = true; d.setDate(d.getDate()+1); count++; }
+    await saveSkipDays();
+    status.style.color = 'var(--sage)';
+    status.textContent = `${count} ${count===1?'dag':'dage'} markeret som ikke sporet.`;
+    document.getElementById('nd-skipday-checkbox').checked = !!skipDays[selectedDate];
+  });
+
+  document.getElementById('nd-export-btn').addEventListener('click', async () => {
+    const btn = document.getElementById('nd-export-btn');
+    btn.textContent = 'Samler data...';
+    const diary = await gatherAllDiary();
+    const exercise = await gatherAllExercise();
+    const weekGoalsAll = await gatherAllWeekGoals();
+    btn.textContent = 'Eksporter data';
+    const payload = {
+      app: 'naeringsdagbog',
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      goals, favorites, weights, weightGoal, goalHistory, notes, customTags, diary, exercise, weekGoals: weekGoalsAll, skipDays, recentFoods, combos, weekSat
+    };
+    const json = JSON.stringify(payload, null, 2);
+    const filename = `naeringsdagbog-backup-${todayIso()}.json`;
+
+    const html = `
+      <div class="mhead"><div class="mtitle fr">Eksporter data</div><button class="mclose" id="nd-exp-close">&times;</button></div>
+      <div class="hint" style="text-align:left;">Download filen, eller kopiér teksten og gem den et sikkert sted. Importér den samme fil på din nye telefon.</div>
+      <div class="btnrow">
+        <button class="btn" id="nd-exp-download">Download fil</button>
+        <button class="btn ghost" id="nd-exp-copy">Kopiér</button>
+      </div>
+      <textarea id="nd-exp-text" readonly style="width:100%; height:160px; margin-top:12px; background: var(--surface); border: 1px solid var(--line); color: var(--text-mid); border-radius: 10px; padding: 10px; font-size: 11px; font-family: 'IBM Plex Mono', monospace;"></textarea>
+    `;
+    openModal(html);
+    document.getElementById('nd-exp-close').addEventListener('click', closeModal);
+    document.getElementById('nd-exp-text').value = json;
+    document.getElementById('nd-exp-download').addEventListener('click', async () => {
+      try {
+        const blob = new Blob([json], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = filename;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        await saveLastExport();
+        renderBackupReminder();
+      } catch(e) {
+        alert('Download virkede ikke her. Kopiér teksten i stedet.');
+      }
+    });
+    document.getElementById('nd-exp-copy').addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(json);
+        const c = document.getElementById('nd-exp-copy');
+        c.textContent = 'Kopieret!';
+        setTimeout(() => c.textContent = 'Kopiér', 1500);
+        await saveLastExport();
+        renderBackupReminder();
+      } catch(e) {
+        document.getElementById('nd-exp-text').select();
+      }
+    });
+  });
+
+  document.getElementById('nd-import-btn').addEventListener('click', () => {
+    const html = `
+      <div class="mhead"><div class="mtitle fr">Importer data</div><button class="mclose" id="nd-imp-close">&times;</button></div>
+      <div class="hint" style="text-align:left;">Vælg en eksporteret fil, eller indsæt teksten. Din nuværende log og favoritter beholdes og lægges sammen med de importerede data.</div>
+      <input type="file" id="nd-imp-file" accept="application/json,.json" style="margin-bottom:10px;">
+      <textarea id="nd-imp-text" placeholder="...eller indsæt JSON-teksten her" style="width:100%; height:120px; background: var(--surface); border: 1px solid var(--line); color: var(--text-hi); border-radius: 10px; padding: 10px; font-size: 12px; font-family: 'IBM Plex Mono', monospace; margin-bottom:10px;"></textarea>
+      <div id="nd-imp-err" style="font-size:12px; color: var(--red); display:none; margin-bottom:8px;"></div>
+      <button class="btn" id="nd-imp-run">Importer</button>
+    `;
+    openModal(html);
+    document.getElementById('nd-imp-close').addEventListener('click', closeModal);
+    document.getElementById('nd-imp-file').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => { document.getElementById('nd-imp-text').value = reader.result; };
+      reader.readAsText(file);
+    });
+    document.getElementById('nd-imp-run').addEventListener('click', async () => {
+      const err = document.getElementById('nd-imp-err');
+      err.style.display = 'none';
+      let data;
+      try {
+        data = JSON.parse(document.getElementById('nd-imp-text').value);
+      } catch(e) {
+        err.textContent = 'Kunne ikke læse filen. Tjek at det er en gyldig eksportfil.';
+        err.style.display = 'block';
+        return;
+      }
+      if (!data || typeof data !== 'object') {
+        err.textContent = 'Filen indeholder ikke genkendelig data.';
+        err.style.display = 'block';
+        return;
+      }
+      const runBtn = document.getElementById('nd-imp-run');
+      runBtn.textContent = 'Importerer...';
+
+      if (data.goals && typeof data.goals === 'object') goals = { ...goals, ...data.goals };
+      if (data.weights && typeof data.weights === 'object') weights = { ...weights, ...data.weights };
+      if (typeof data.weightGoal === 'number') weightGoal = data.weightGoal;
+      if (data.notes && typeof data.notes === 'object') notes = { ...notes, ...data.notes };
+      if (data.skipDays && typeof data.skipDays === 'object') skipDays = { ...skipDays, ...data.skipDays };
+      if (Array.isArray(data.recentFoods)) {
+        const existingKeys = new Set(recentFoods.map(r => (r.name+'|'+(r.brand||'')).toLowerCase()));
+        data.recentFoods.forEach(r => { const k = (r.name+'|'+(r.brand||'')).toLowerCase(); if (!existingKeys.has(k)) { recentFoods.push(r); existingKeys.add(k); } });
+        recentFoods = recentFoods.slice(0, 20);
+      }
+      if (Array.isArray(data.combos)) {
+        const existingIds = new Set(combos.map(c => c.id));
+        data.combos.forEach(c => { if (!existingIds.has(c.id)) combos.push(c); });
+      }
+      if (data.weekSat && typeof data.weekSat === 'object') weekSat = { ...weekSat, ...data.weekSat };
+      if (Array.isArray(data.customTags)) {
+        data.customTags.forEach(t => { if (!customTags.some(x => x.toLowerCase() === String(t).toLowerCase())) customTags.push(t); });
+      }
+      if (Array.isArray(data.goalHistory)) {
+        const existingTs = new Set(goalHistory.map(h => h.timestamp));
+        data.goalHistory.forEach(h => { if (h && h.timestamp && !existingTs.has(h.timestamp)) goalHistory.push(h); });
+        goalHistory.sort((a,b) => a.timestamp.localeCompare(b.timestamp));
+      }
+      if (Array.isArray(data.favorites)) {
+        const existingIds = new Set(favorites.map(f => f.id));
+        data.favorites.forEach(f => { if (!existingIds.has(f.id)) favorites.push(f); });
+      }
+      if (data.diary && typeof data.diary === 'object') {
+        for (const dateStr of Object.keys(data.diary)) {
+          const incoming = data.diary[dateStr];
+          if (!Array.isArray(incoming)) continue;
+          let existing = [];
+          try {
+            if (dateStr === selectedDate) {
+              existing = entries;
+            } else {
+              const r = await window.storage.get(diaryKey(dateStr), false);
+              existing = (r && r.value) ? JSON.parse(r.value) : [];
+            }
+          } catch(e) { existing = []; }
+          const existingIds = new Set(existing.map(x => x.id));
+          const merged = existing.concat(incoming.filter(x => !existingIds.has(x.id)));
+          if (dateStr === selectedDate) { entries = merged; await saveEntries(); }
+          else { await window.storage.set(diaryKey(dateStr), JSON.stringify(merged), false); }
+        }
+      }
+      if (data.exercise && typeof data.exercise === 'object') {
+        for (const dateStr of Object.keys(data.exercise)) {
+          const incoming = data.exercise[dateStr];
+          if (!Array.isArray(incoming)) continue;
+          let existing = [];
+          try {
+            if (dateStr === selectedDate) {
+              existing = exerciseEntries;
+            } else {
+              const r = await window.storage.get(exerciseKey(dateStr), false);
+              existing = (r && r.value) ? JSON.parse(r.value) : [];
+            }
+          } catch(e) { existing = []; }
+          const existingIds = new Set(existing.map(x => x.id));
+          const merged = existing.concat(incoming.filter(x => !existingIds.has(x.id)));
+          if (dateStr === selectedDate) { exerciseEntries = merged; await saveExercise(); }
+          else { await window.storage.set(exerciseKey(dateStr), JSON.stringify(merged), false); }
+        }
+      }
+      if (data.weekGoals && typeof data.weekGoals === 'object') {
+        const currentWeekKey = isoWeekKeyFor(weekAnchor);
+        for (const weekStr of Object.keys(data.weekGoals)) {
+          const incoming = data.weekGoals[weekStr];
+          if (!Array.isArray(incoming)) continue;
+          let existing = [];
+          try {
+            if (weekStr === currentWeekKey) {
+              existing = weekGoals;
+            } else {
+              const r = await window.storage.get(weekGoalsKey(weekStr), false);
+              existing = (r && r.value) ? JSON.parse(r.value) : [];
+            }
+          } catch(e) { existing = []; }
+          const existingIds = new Set(existing.map(x => x.id));
+          const merged = existing.concat(incoming.filter(x => !existingIds.has(x.id)));
+          if (weekStr === currentWeekKey) { weekGoals = merged; await saveWeekGoals(); }
+          else { await window.storage.set(weekGoalsKey(weekStr), JSON.stringify(merged), false); }
+        }
+      }
+      await Promise.all([saveGoals(), saveFavorites(), saveWeights(), saveGoalHistory(), saveNotes(), saveCustomTags(), saveWeightGoal(), saveSkipDays(), saveRecentFoods(), saveCombos(), saveWeekSat()]);
+      renderToday();
+      renderGoalsForm();
+      renderGoalHistory();
+      renderWeekGoalsScreen();
+      renderBackupReminder();
+      closeModal();
+    });
+  });
+
+  (async function init(){
+    document.getElementById('nd-day-picker').max = todayIso();
+    await Promise.all([loadGoals(), loadEntries(), loadFavorites(), loadWeights(), loadGoalHistory(), loadNotes(), loadCustomTags(), loadWeightGoal(), loadExercise(), loadWeekGoals(), loadSkipDays(), loadRecentFoods(), loadCombos(), loadLastExport(), loadWeekSat()]);
+    renderToday();
+    renderGoalsForm();
+    renderGoalHistory();
+    renderBackupReminder();
+    checkLoggingGap();
+  })();
+})();
+</script>
+
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch(() => {});
+    });
+  }
+</script>
+</body>
+</html>
