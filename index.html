@@ -1411,7 +1411,7 @@
     back.id = 'nd-modal-back';
     back.innerHTML = `<div class="modal">${html}</div>`;
     back.addEventListener('click', (e) => { if (e.target === back) closeModal(); });
-    document.body.appendChild(back);
+    app.appendChild(back);
     return back;
   }
   function closeModal(){
@@ -1486,19 +1486,36 @@
   function showScanTab(){
     setActiveTab('scan');
     const body = document.getElementById('nd-tab-body');
-    body.innerHTML = `<div class="hint">Ret kameraet mod stregkoden</div><div id="nd-scanbox"></div><div id="nd-scan-status" class="hint"></div>`;
+    body.innerHTML = `
+      <div class="hint">Ret kameraet mod stregkoden og hold roligt et par sekunder</div>
+      <div id="nd-scanbox"></div>
+      <div id="nd-scan-status" class="hint"></div>
+      <div class="section-lbl" style="margin-top:16px;"><span>Virker scanningen ikke?</span></div>
+      <div class="hint" style="text-align:left; margin-bottom:8px;">Indtast stregkodens tal manuelt i stedet (står under selve stregkoden på emballagen).</div>
+      <div style="display:flex; gap:8px;">
+        <input type="text" inputmode="numeric" id="nd-manual-barcode" placeholder="fx 5701234567890" style="flex:1; margin-bottom:0;">
+        <button class="btn ghost" id="nd-manual-barcode-go" style="width:auto; padding:0 16px;">Slå op</button>
+      </div>
+    `;
+    document.getElementById('nd-manual-barcode-go').addEventListener('click', () => {
+      const code = document.getElementById('nd-manual-barcode').value.trim();
+      if (code) onBarcode(code);
+    });
+    document.getElementById('nd-manual-barcode').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') document.getElementById('nd-manual-barcode-go').click();
+    });
     startScanner();
   }
   function startScanner(){
     stopScanner();
-    if (typeof Html5Qrcode === 'undefined') { document.getElementById('nd-scan-status').textContent = 'Scanner kunne ikke indlæses.'; return; }
+    if (typeof Html5Qrcode === 'undefined') { document.getElementById('nd-scan-status').textContent = 'Scanner kunne ikke indlæses. Brug feltet nedenfor til at indtaste koden manuelt.'; return; }
     scanner = new Html5Qrcode('nd-scanbox');
     scanner.start(
       { facingMode: 'environment' },
-      { fps: 10, qrbox: { width: 240, height: 140 }, formatsToSupport: [ Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.EAN_8, Html5QrcodeSupportedFormats.UPC_A, Html5QrcodeSupportedFormats.UPC_E ] },
+      { fps: 10, qrbox: { width: 280, height: 160 }, formatsToSupport: [ Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.EAN_8, Html5QrcodeSupportedFormats.UPC_A, Html5QrcodeSupportedFormats.UPC_E ] },
       (decodedText) => onBarcode(decodedText),
       () => {}
-    ).catch(() => { const s = document.getElementById('nd-scan-status'); if (s) s.textContent = 'Kunne ikke få adgang til kameraet.'; });
+    ).catch(() => { const s = document.getElementById('nd-scan-status'); if (s) s.textContent = 'Kunne ikke få adgang til kameraet. Brug feltet nedenfor i stedet.'; });
   }
   function stopScanner(){
     if (scanner) { scanner.stop().then(() => scanner.clear()).catch(() => {}); scanner = null; }
