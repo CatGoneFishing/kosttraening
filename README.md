@@ -1,10 +1,10 @@
-# Næringsdagbog
+# Hold Formen
 
 En personlig kost-, vægt- og træningsdagbog. Statisk web-app – ingen server, ingen build-trin. Al data gemmes lokalt i din browser (localStorage) på den enhed, du bruger den fra.
 
 ## Sådan lægger du den på GitHub Pages
 
-1. Opret et nyt, offentligt repository på GitHub (fx `naeringsdagbog`).
+1. Opret et nyt, offentligt repository på GitHub (fx `hold-formen`).
 2. Upload alle filerne i denne mappe til roden af repositoriet:
    - `index.html`
    - `manifest.json`
@@ -13,7 +13,7 @@ En personlig kost-, vægt- og træningsdagbog. Statisk web-app – ingen server,
    - `icon-512.png`
 3. Gå til repositoriets **Settings → Pages**.
 4. Under "Build and deployment" vælger du **Source: Deploy from a branch**, branch **main**, mappe **/ (root)**. Gem.
-5. Efter et minuts tid er siden tilgængelig på `https://DIT-BRUGERNAVN.github.io/naeringsdagbog/`.
+5. Efter et minuts tid er siden tilgængelig på `https://DIT-BRUGERNAVN.github.io/hold-formen/`.
 
 ## Sådan får du den som en app på telefonen
 

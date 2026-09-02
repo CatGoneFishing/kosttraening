@@ -1,6 +1,6 @@
 {
-  "name": "Næringsdagbog",
-  "short_name": "Næringsdagbog",
+  "name": "Hold Formen",
+  "short_name": "Hold Formen",
   "description": "Personlig kost-, vægt- og træningsdagbog",
   "start_url": "./index.html",
   "scope": "./",

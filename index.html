@@ -3,14 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Næringsdagbog</title>
+<title>Hold Formen</title>
 <meta name="description" content="Personlig kost-, vægt- og træningsdagbog">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#16231C">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Næringsdagbog">
+<meta name="apple-mobile-web-app-title" content="Hold Formen">
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="icon" href="icon-192.png">
 <style>
@@ -2598,7 +2598,7 @@
       goals, favorites, weights, weightGoal, goalHistory, notes, customTags, diary, exercise, weekGoals: weekGoalsAll, skipDays, recentFoods, combos, weekSat, foodFocusHistory
     };
     const json = JSON.stringify(payload, null, 2);
-    const filename = `naeringsdagbog-backup-${todayIso()}.json`;
+    const filename = `hold-formen-backup-${todayIso()}.json`;
 
     const html = `
       <div class="mhead"><div class="mtitle fr">Eksporter data</div><button class="mclose" id="nd-exp-close">&times;</button></div>
