@@ -18,8 +18,6 @@
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
 <script>
-  // Lokal erstatning for Claude-artifactens window.storage, baseret på browserens localStorage.
-  // Gemmer alt under samme oprindelse (din GitHub Pages-adresse), så data ligger på telefonen/i browseren.
   (function () {
     const PREFIX = 'naeringsdagbog__';
     window.storage = {
@@ -214,7 +212,7 @@
       Jeg logger ikke i dag – tæl ikke dagen med i overblikket
     </label>
 
-    <div class="ring-wrap">
+    <div class="ring-wrap" id="nd-ring-wrap">
       <svg width="190" height="190" viewBox="0 0 190 190">
         <circle class="ring-center" cx="95" cy="95" r="78" stroke="#263A2C" stroke-width="14"/>
         <g id="nd-ring-arcs"></g>
@@ -223,7 +221,7 @@
       </svg>
     </div>
 
-    <div class="macrobar-row">
+    <div class="macrobar-row" id="nd-macro-row">
       <div class="macrobar">
         <div class="top"><span>Protein</span><span class="mono" id="nd-m-protein">0/0g</span></div>
         <div class="track"><div class="fill" id="nd-m-protein-fill" style="background:var(--coral); width:0%"></div></div>
@@ -276,6 +274,16 @@
       <option value="all">Siden første logning</option>
     </select>
     <div id="nd-ov-body"></div>
+
+    <div class="section-lbl" style="margin-top:26px;"><span>Søg i træningshistorik</span></div>
+    <div id="nd-ex-search-chips" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px;"></div>
+    <input type="text" id="nd-ex-search-input" placeholder="Aktivitet, fx Romaskine">
+    <div class="segtabs" style="margin-top:0; grid-template-columns: 1fr 1fr 1fr;">
+      <button id="nd-ex-sort-fastest" class="active">Hurtigst</button>
+      <button id="nd-ex-sort-longest">Længst</button>
+      <button id="nd-ex-sort-newest">Nyeste</button>
+    </div>
+    <div id="nd-ex-search-results"></div>
   </div>
 
   <div class="screen" id="nd-screen-weight">
@@ -296,6 +304,14 @@
 
   <div class="screen" id="nd-screen-goals">
     <div class="topbar"><div><div class="date">Indstillinger</div><div class="title fr">Dine mål</div></div></div>
+
+    <div class="section-lbl" style="margin-top:0;"><span>Fokus</span></div>
+    <label class="chk" id="nd-food-focus-label" style="margin: 0 0 4px;">
+      <input type="checkbox" id="nd-food-focus-toggle">
+      Jeg fokuserer på madlogning lige nu
+    </label>
+    <div class="hint" style="text-align:left; margin-bottom:14px;">Når den er slået fra, skjules alt om mad og kalorier – kun træning, vægt og mål vises. Din tidligere data gemmes stadig og dukker frem igen, når du slår den til.</div>
+    <div id="nd-food-focus-history" style="margin-bottom:20px;"></div>
 
     <div class="section-lbl" style="margin-top:0;"><span>Ugemål (træning)</span></div>
     <div class="topbar" style="margin-bottom:10px;">
@@ -325,23 +341,25 @@
     <div class="section-lbl" style="margin-top:22px;"><span>Seneste uger</span></div>
     <div id="nd-week-history"></div>
 
-    <div class="section-lbl" style="margin-top:28px;"><span>Kcal- og makromål</span></div>
-    <label class="fieldlbl">Kalorier (kcal/dag)</label>
-    <input type="number" id="nd-goal-kcal" placeholder="fx 2000">
-    <div class="goalgrid">
-      <div>
-        <label class="fieldlbl">Protein (g)</label>
-        <input type="number" id="nd-goal-protein" placeholder="fx 120">
+    <div id="nd-kcal-goals-section">
+      <div class="section-lbl" style="margin-top:28px;"><span>Kcal- og makromål</span></div>
+      <label class="fieldlbl">Kalorier (kcal/dag)</label>
+      <input type="number" id="nd-goal-kcal" placeholder="fx 2000">
+      <div class="goalgrid">
+        <div>
+          <label class="fieldlbl">Protein (g)</label>
+          <input type="number" id="nd-goal-protein" placeholder="fx 120">
+        </div>
+        <div>
+          <label class="fieldlbl">Kulhydrat (g)</label>
+          <input type="number" id="nd-goal-carbs" placeholder="fx 220">
+        </div>
       </div>
-      <div>
-        <label class="fieldlbl">Kulhydrat (g)</label>
-        <input type="number" id="nd-goal-carbs" placeholder="fx 220">
-      </div>
+      <label class="fieldlbl">Fedt (g)</label>
+      <input type="number" id="nd-goal-fat" placeholder="fx 65">
+      <button class="btn" id="nd-goal-save" style="margin-top:8px">Gem mål</button>
+      <div id="nd-goal-msg" style="font-size:12px; color: var(--lime); margin-top:10px; display:none">Gemt.</div>
     </div>
-    <label class="fieldlbl">Fedt (g)</label>
-    <input type="number" id="nd-goal-fat" placeholder="fx 65">
-    <button class="btn" id="nd-goal-save" style="margin-top:8px">Gem mål</button>
-    <div id="nd-goal-msg" style="font-size:12px; color: var(--lime); margin-top:10px; display:none">Gemt.</div>
 
     <label class="fieldlbl" style="margin-top:20px;">Målvægt (kg)</label>
     <div class="btnrow" style="margin-top:0;">
@@ -350,17 +368,21 @@
     </div>
     <div id="nd-weight-goal-status" class="hint" style="text-align:left; margin-top:6px;"></div>
 
-    <div class="section-lbl" style="margin-top:28px;"><span>Historik for mål</span></div>
-    <div id="nd-goal-history"></div>
-
-    <div class="section-lbl" style="margin-top:28px;"><span>Marker periode som ikke sporet</span></div>
-    <div class="hint" style="text-align:left; margin-bottom:10px;">Til perioder du ikke har logget mad i, fx en pause på flere uger eller måneder. Trækkes ud af dine gennemsnit og "dage logget" i Overblik.</div>
-    <div class="goalgrid">
-      <div><label class="fieldlbl">Fra</label><input type="date" id="nd-bulkskip-from"></div>
-      <div><label class="fieldlbl">Til</label><input type="date" id="nd-bulkskip-to"></div>
+    <div id="nd-goal-history-section">
+      <div class="section-lbl" style="margin-top:28px;"><span>Historik for mål</span></div>
+      <div id="nd-goal-history"></div>
     </div>
-    <button class="btn ghost" id="nd-bulkskip-apply">Marker perioden</button>
-    <div id="nd-bulkskip-status" class="hint" style="text-align:left; margin-top:6px;"></div>
+
+    <div id="nd-bulkskip-section">
+      <div class="section-lbl" style="margin-top:28px;"><span>Marker periode som ikke sporet</span></div>
+      <div class="hint" style="text-align:left; margin-bottom:10px;">Til perioder du ikke har logget mad i, fx en pause på flere uger eller måneder. Trækkes ud af dine gennemsnit og "dage logget" i Overblik.</div>
+      <div class="goalgrid">
+        <div><label class="fieldlbl">Fra</label><input type="date" id="nd-bulkskip-from"></div>
+        <div><label class="fieldlbl">Til</label><input type="date" id="nd-bulkskip-to"></div>
+      </div>
+      <button class="btn ghost" id="nd-bulkskip-apply">Marker perioden</button>
+      <div id="nd-bulkskip-status" class="hint" style="text-align:left; margin-top:6px;"></div>
+    </div>
 
     <div class="section-lbl" style="margin-top:28px;"><span>Data</span></div>
     <div class="hint" style="text-align:left; margin-bottom:10px;">Tag din log, favoritter, vægt og mål med til en ny telefon.</div>
@@ -394,6 +416,8 @@
   const KEY_LAST_EXPORT = 'nd_last_export';
   const KEY_GAP_DISMISSED = 'nd_gap_dismissed_for';
   const KEY_WEEK_SAT = 'nd_week_satisfaction';
+  const KEY_FOOD_FOCUS = 'nd_food_focus';
+  const KEY_FOOD_FOCUS_HISTORY = 'nd_food_focus_history';
   const KEY_GOAL_HISTORY = 'nd_goal_history';
   const KEY_NOTES = 'nd_notes';
   const KEY_CUSTOM_TAGS = 'nd_custom_tags';
@@ -480,6 +504,8 @@
   let weekAnchor = new Date();
   let weekGoals = [];
   let weekSat = {};
+  let foodFocusEnabled = false;
+  let foodFocusHistory = [];
   let searchDebounce = null;
   let scanner = null;
   let editingWeightDate = null;
@@ -516,6 +542,32 @@
     catch(e) { weekSat = {}; }
   }
   async function saveWeekSat(){ await window.storage.set(KEY_WEEK_SAT, JSON.stringify(weekSat), false); }
+
+  async function loadFoodFocus(){
+    try { const r = await window.storage.get(KEY_FOOD_FOCUS, false); foodFocusEnabled = (r && r.value) ? r.value === 'true' : false; }
+    catch(e) { foodFocusEnabled = false; }
+  }
+  async function saveFoodFocus(){ await window.storage.set(KEY_FOOD_FOCUS, String(foodFocusEnabled), false); }
+
+  async function loadFoodFocusHistory(){
+    try { const r = await window.storage.get(KEY_FOOD_FOCUS_HISTORY, false); foodFocusHistory = (r && r.value) ? JSON.parse(r.value) : []; }
+    catch(e) { foodFocusHistory = []; }
+  }
+  async function saveFoodFocusHistory(){ await window.storage.set(KEY_FOOD_FOCUS_HISTORY, JSON.stringify(foodFocusHistory), false); }
+  function renderFoodFocusHistory(){
+    const el = document.getElementById('nd-food-focus-history');
+    if (!el) return;
+    if (foodFocusHistory.length === 0) { el.innerHTML = ''; return; }
+    const rows = foodFocusHistory.slice().reverse().slice(0, 20).map(h => {
+      const d = new Date(h.timestamp);
+      const dateStr = d.toLocaleDateString('da-DK', { day:'numeric', month:'short', year:'numeric' });
+      const timeStr = d.toLocaleTimeString('da-DK', { hour:'2-digit', minute:'2-digit' });
+      const label = h.enabled ? 'Slået til' : 'Slået fra';
+      const color = h.enabled ? 'var(--sage)' : 'var(--text-lo)';
+      return `<div class="weightrow" style="cursor:default;"><div class="wd">${dateStr} kl. ${timeStr}</div><div class="wv" style="font-size:12px; color:${color};">${label}</div></div>`;
+    }).join('');
+    el.innerHTML = `<div class="section-lbl" style="margin-top:4px;"><span>Historik for fokus</span></div>${rows}`;
+  }
 
   async function loadFavorites(){
     try { const r = await window.storage.get(KEY_FAVORITES, false); favorites = (r && r.value) ? JSON.parse(r.value) : []; }
@@ -761,7 +813,7 @@
 
   async function checkLoggingGap(){
     const banner = document.getElementById('nd-gap-banner');
-    if (!banner || selectedDate !== todayIso()) { if (banner) banner.style.display = 'none'; return; }
+    if (!banner || selectedDate !== todayIso() || !foodFocusEnabled) { if (banner) banner.style.display = 'none'; return; }
     const lastLogged = await findLastLoggedDate();
     if (!lastLogged) { banner.style.display = 'none'; return; }
     const gapDays = Math.round((new Date(todayIso()+'T00:00:00') - new Date(lastLogged+'T00:00:00')) / 86400000) - 1;
@@ -793,6 +845,32 @@
       document.getElementById('nd-skipday-checkbox').checked = !!skipDays[selectedDate];
     });
   }
+
+  function applyFoodFocusVisibility(){
+    const showFood = foodFocusEnabled;
+    const foodIds = ['nd-ring-wrap', 'nd-macro-row', 'nd-meal-dist', 'nd-meal-groups', 'nd-skipday-label', 'nd-gap-banner', 'nd-kcal-goals-section', 'nd-goal-history-section', 'nd-bulkskip-section'];
+    foodIds.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = showFood ? '' : 'none';
+    });
+    const foodFab = document.getElementById('nd-fab');
+    if (foodFab) foodFab.style.display = showFood ? 'flex' : 'none';
+    const exerciseFab = document.getElementById('nd-fab-exercise');
+    if (exerciseFab) exerciseFab.classList.toggle('fab-left', showFood);
+    const toggle = document.getElementById('nd-food-focus-toggle');
+    if (toggle) toggle.checked = showFood;
+    if (!showFood) { const banner = document.getElementById('nd-gap-banner'); if (banner) banner.style.display = 'none'; }
+  }
+  document.getElementById('nd-food-focus-toggle').addEventListener('change', async (e) => {
+    foodFocusEnabled = e.target.checked;
+    await saveFoodFocus();
+    foodFocusHistory.push({ timestamp: new Date().toISOString(), enabled: foodFocusEnabled });
+    await saveFoodFocusHistory();
+    renderFoodFocusHistory();
+    applyFoodFocusVisibility();
+    renderToday();
+    if (document.getElementById('nd-screen-overview').classList.contains('active')) renderOverview(currentRange);
+  });
 
   function renderDayNote(){
     const el = document.getElementById('nd-daynote');
@@ -963,10 +1041,22 @@
     document.getElementById('nd-ex-close').addEventListener('click', closeModal);
 
     const isHulen = () => document.getElementById('nd-ex-activity').value.trim().toLowerCase() === 'hulen';
+    const isSwimming = () => document.getElementById('nd-ex-activity').value.trim().toLowerCase() === 'svømning';
     const syncTypeVisibility = () => {
       document.getElementById('nd-ex-type-wrap').style.display = isHulen() ? 'block' : 'none';
     };
-    document.getElementById('nd-ex-activity').addEventListener('input', syncTypeVisibility);
+    document.getElementById('nd-ex-activity').addEventListener('input', () => {
+      syncTypeVisibility();
+      if (isSwimming() && !document.getElementById('nd-ex-distance').value) {
+        document.getElementById('nd-ex-unit').value = 'm';
+      }
+    });
+    document.getElementById('nd-ex-type').addEventListener('change', (e) => {
+      if (e.target.value === 'Hold') {
+        document.getElementById('nd-ex-duration-min').value = 60;
+        document.getElementById('nd-ex-duration-sec').value = 0;
+      }
+    });
 
     const chipsWrap = document.getElementById('nd-ex-chips');
     EXERCISE_ACTIVITIES.forEach(a => {
@@ -974,7 +1064,11 @@
       btn.className = 'chip';
       btn.type = 'button';
       btn.textContent = a;
-      btn.addEventListener('click', () => { document.getElementById('nd-ex-activity').value = a; syncTypeVisibility(); });
+      btn.addEventListener('click', () => {
+        document.getElementById('nd-ex-activity').value = a;
+        syncTypeVisibility();
+        if (a.toLowerCase() === 'svømning') document.getElementById('nd-ex-unit').value = 'm';
+      });
       chipsWrap.appendChild(btn);
     });
 
@@ -1849,6 +1943,40 @@
   async function renderOverview(rangeVal){
     const body = document.getElementById('nd-ov-body');
     body.innerHTML = '<div class="hint">Henter data...</div>';
+
+    if (!foodFocusEnabled) {
+      let sd;
+      if (rangeVal === 'all') {
+        const em = await gatherAllExercise();
+        const exDates = Object.keys(em).filter(d => em[d] && em[d].length > 0).sort();
+        if (exDates.length === 0) { body.innerHTML = '<div class="empty">Ingen træning logget endnu.</div>'; return; }
+        sd = new Date(exDates[0] + 'T00:00:00');
+      } else {
+        sd = new Date(); sd.setDate(sd.getDate() - (Number(rangeVal) - 1));
+      }
+      const td = new Date();
+      const ds = [];
+      for (let d = new Date(sd); d <= td; d.setDate(d.getDate()+1)) ds.push(isoDate(d));
+      const exMap2 = await gatherAllExercise();
+      const exDaysCount2 = ds.filter(d => (exMap2[d] || []).length > 0).length;
+      const exAgg2 = aggregateExercise(exMap2, ds);
+      const exerciseHtml2 = exAgg2.length ? `
+        <div class="section-lbl"><span>Træning i perioden</span></div>
+        ${exAgg2.map(a => `
+          <div class="entry" style="cursor:default;">
+            <div><div class="name">${escapeHtml(a.activity)}</div><div class="sub">${a.count} ${a.count===1?'gang':'gange'}${a.minutes ? ' · '+a.minutes+' min' : ''}${a.distanceLabel ? ' · '+a.distanceLabel : ''}</div></div>
+          </div>
+        `).join('')}
+      ` : '<div class="empty">Ingen træning logget i denne periode.</div>';
+      body.innerHTML = `
+        <div class="statgrid">
+          <div class="statcard"><div class="lbl">Træningsdage</div><div class="val">${exDaysCount2}/${ds.length}</div></div>
+        </div>
+        ${exerciseHtml2}
+      `;
+      return;
+    }
+
     const diaryMap = await gatherAllDiary();
     const loggedDates = Object.keys(diaryMap).sort();
     const exerciseMap = await gatherAllExercise();
@@ -2275,6 +2403,83 @@
     return map;
   }
 
+  async function searchExerciseHistory(query, sortMode){
+    const map = await gatherAllExercise();
+    const results = [];
+    Object.keys(map).forEach(date => {
+      (map[date] || []).forEach(e => {
+        if (e.activity && e.activity.trim().toLowerCase() === query.trim().toLowerCase()) {
+          results.push({ ...e, date });
+        }
+      });
+    });
+    if (sortMode === 'fastest') {
+      results.sort((a,b) => (a.duration_min ?? Infinity) - (b.duration_min ?? Infinity));
+    } else if (sortMode === 'longest') {
+      const metersOf = r => r.distance_value ? (r.distance_unit === 'km' ? r.distance_value*1000 : r.distance_value) : -Infinity;
+      results.sort((a,b) => metersOf(b) - metersOf(a));
+    } else {
+      results.sort((a,b) => b.date.localeCompare(a.date));
+    }
+    return results;
+  }
+
+  function getActiveSortMode(){
+    if (document.getElementById('nd-ex-sort-fastest').classList.contains('active')) return 'fastest';
+    if (document.getElementById('nd-ex-sort-longest').classList.contains('active')) return 'longest';
+    return 'newest';
+  }
+  function setActiveSortMode(mode){
+    ['fastest','longest','newest'].forEach(m => document.getElementById('nd-ex-sort-'+m).classList.toggle('active', m===mode));
+  }
+
+  let exSearchDebounce = null;
+  async function renderExerciseSearch(){
+    const query = document.getElementById('nd-ex-search-input').value.trim();
+    const resultsEl = document.getElementById('nd-ex-search-results');
+    if (!query) { resultsEl.innerHTML = ''; return; }
+    resultsEl.innerHTML = '<div class="hint">Søger...</div>';
+    const sortMode = getActiveSortMode();
+    const results = await searchExerciseHistory(query, sortMode);
+    if (results.length === 0) { resultsEl.innerHTML = `<div class="empty">Ingen træning fundet for "${escapeHtml(query)}".</div>`; return; }
+    const badgeLabel = sortMode === 'fastest' ? 'Hurtigst' : sortMode === 'longest' ? 'Længst' : null;
+    resultsEl.innerHTML = results.map((r, i) => {
+      const durLabel = formatDuration(r.duration_min) || '';
+      const distLabel = r.distance_value ? `${fmt(r.distance_value)} ${r.distance_unit}` : '';
+      const dateLabel = new Date(r.date+'T00:00:00').toLocaleDateString('da-DK', { day:'numeric', month:'short', year:'numeric' });
+      const showBadge = badgeLabel && i === 0 && (sortMode === 'fastest' ? r.duration_min : r.distance_value);
+      const badge = showBadge ? `<span style="color:var(--sage); font-size:11px; margin-left:8px;">${badgeLabel}</span>` : '';
+      return `<div class="entry" style="cursor:default;">
+        <div><div class="name">${dateLabel}${r.type ? ' &middot; '+escapeHtml(r.type) : ''}${badge}</div><div class="sub">${[durLabel, distLabel].filter(Boolean).join(' &middot; ') || '&mdash;'}</div></div>
+      </div>`;
+    }).join('');
+  }
+  const DISTANCE_FOCUS_ACTIVITIES = ['svømning'];
+  const TIME_FOCUS_ACTIVITIES = ['romaskine', 'løb', 'cykling'];
+  const exSearchChipsWrap = document.getElementById('nd-ex-search-chips');
+  EXERCISE_ACTIVITIES.forEach(a => {
+    const btn = document.createElement('button');
+    btn.className = 'chip';
+    btn.type = 'button';
+    btn.textContent = a;
+    btn.addEventListener('click', () => {
+      document.getElementById('nd-ex-search-input').value = a;
+      const al = a.toLowerCase();
+      if (DISTANCE_FOCUS_ACTIVITIES.includes(al)) setActiveSortMode('longest');
+      else if (TIME_FOCUS_ACTIVITIES.includes(al)) setActiveSortMode('fastest');
+      else setActiveSortMode('newest');
+      renderExerciseSearch();
+    });
+    exSearchChipsWrap.appendChild(btn);
+  });
+  document.getElementById('nd-ex-search-input').addEventListener('input', () => {
+    clearTimeout(exSearchDebounce);
+    exSearchDebounce = setTimeout(renderExerciseSearch, 350);
+  });
+  document.getElementById('nd-ex-sort-fastest').addEventListener('click', () => { setActiveSortMode('fastest'); renderExerciseSearch(); });
+  document.getElementById('nd-ex-sort-longest').addEventListener('click', () => { setActiveSortMode('longest'); renderExerciseSearch(); });
+  document.getElementById('nd-ex-sort-newest').addEventListener('click', () => { setActiveSortMode('newest'); renderExerciseSearch(); });
+
   async function gatherAllWeekGoals(){
     const map = {};
     try {
@@ -2317,7 +2522,7 @@
       app: 'naeringsdagbog',
       version: 1,
       exportedAt: new Date().toISOString(),
-      goals, favorites, weights, weightGoal, goalHistory, notes, customTags, diary, exercise, weekGoals: weekGoalsAll, skipDays, recentFoods, combos, weekSat
+      goals, favorites, weights, weightGoal, goalHistory, notes, customTags, diary, exercise, weekGoals: weekGoalsAll, skipDays, recentFoods, combos, weekSat, foodFocusHistory
     };
     const json = JSON.stringify(payload, null, 2);
     const filename = `naeringsdagbog-backup-${todayIso()}.json`;
@@ -2414,6 +2619,11 @@
         data.combos.forEach(c => { if (!existingIds.has(c.id)) combos.push(c); });
       }
       if (data.weekSat && typeof data.weekSat === 'object') weekSat = { ...weekSat, ...data.weekSat };
+      if (Array.isArray(data.foodFocusHistory)) {
+        const existingTs = new Set(foodFocusHistory.map(h => h.timestamp));
+        data.foodFocusHistory.forEach(h => { if (h && h.timestamp && !existingTs.has(h.timestamp)) foodFocusHistory.push(h); });
+        foodFocusHistory.sort((a,b) => a.timestamp.localeCompare(b.timestamp));
+      }
       if (Array.isArray(data.customTags)) {
         data.customTags.forEach(t => { if (!customTags.some(x => x.toLowerCase() === String(t).toLowerCase())) customTags.push(t); });
       }
@@ -2484,10 +2694,11 @@
           else { await window.storage.set(weekGoalsKey(weekStr), JSON.stringify(merged), false); }
         }
       }
-      await Promise.all([saveGoals(), saveFavorites(), saveWeights(), saveGoalHistory(), saveNotes(), saveCustomTags(), saveWeightGoal(), saveSkipDays(), saveRecentFoods(), saveCombos(), saveWeekSat()]);
+      await Promise.all([saveGoals(), saveFavorites(), saveWeights(), saveGoalHistory(), saveNotes(), saveCustomTags(), saveWeightGoal(), saveSkipDays(), saveRecentFoods(), saveCombos(), saveWeekSat(), saveFoodFocusHistory()]);
       renderToday();
       renderGoalsForm();
       renderGoalHistory();
+      renderFoodFocusHistory();
       renderWeekGoalsScreen();
       renderBackupReminder();
       closeModal();
@@ -2496,10 +2707,12 @@
 
   (async function init(){
     document.getElementById('nd-day-picker').max = todayIso();
-    await Promise.all([loadGoals(), loadEntries(), loadFavorites(), loadWeights(), loadGoalHistory(), loadNotes(), loadCustomTags(), loadWeightGoal(), loadExercise(), loadWeekGoals(), loadSkipDays(), loadRecentFoods(), loadCombos(), loadLastExport(), loadWeekSat()]);
+    await Promise.all([loadGoals(), loadEntries(), loadFavorites(), loadWeights(), loadGoalHistory(), loadNotes(), loadCustomTags(), loadWeightGoal(), loadExercise(), loadWeekGoals(), loadSkipDays(), loadRecentFoods(), loadCombos(), loadLastExport(), loadWeekSat(), loadFoodFocus(), loadFoodFocusHistory()]);
+    applyFoodFocusVisibility();
     renderToday();
     renderGoalsForm();
     renderGoalHistory();
+    renderFoodFocusHistory();
     renderBackupReminder();
     checkLoggingGap();
   })();
