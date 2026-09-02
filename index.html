@@ -266,6 +266,7 @@
   <div class="screen" id="nd-screen-overview">
     <div class="topbar"><div><div class="date">Statistik</div><div class="title fr">Overblik</div></div></div>
     <select id="nd-ov-range">
+      <option value="thisweek">Denne uge</option>
       <option value="7">Seneste 7 dage</option>
       <option value="30">Seneste 30 dage</option>
       <option value="90">Seneste 3 måneder</option>
@@ -304,14 +305,6 @@
 
   <div class="screen" id="nd-screen-goals">
     <div class="topbar"><div><div class="date">Indstillinger</div><div class="title fr">Dine mål</div></div></div>
-
-    <div class="section-lbl" style="margin-top:0;"><span>Fokus</span></div>
-    <label class="chk" id="nd-food-focus-label" style="margin: 0 0 4px;">
-      <input type="checkbox" id="nd-food-focus-toggle">
-      Jeg fokuserer på madlogning lige nu
-    </label>
-    <div class="hint" style="text-align:left; margin-bottom:14px;">Når den er slået fra, skjules alt om mad og kalorier – kun træning, vægt og mål vises. Din tidligere data gemmes stadig og dukker frem igen, når du slår den til.</div>
-    <div id="nd-food-focus-history" style="margin-bottom:20px;"></div>
 
     <div class="section-lbl" style="margin-top:0;"><span>Ugemål (træning)</span></div>
     <div class="topbar" style="margin-bottom:10px;">
@@ -392,7 +385,15 @@
     </div>
     <div id="nd-backup-reminder" class="hint" style="text-align:left; margin-top:8px;"></div>
 
-    <button class="btn ghost" id="nd-help-btn" style="margin-top:28px;">Sådan virker appen</button>
+    <div class="section-lbl" style="margin-top:28px;"><span>Fokus</span></div>
+    <label class="chk" id="nd-food-focus-label" style="margin: 0 0 4px;">
+      <input type="checkbox" id="nd-food-focus-toggle">
+      Jeg fokuserer på madlogning lige nu
+    </label>
+    <div class="hint" style="text-align:left; margin-bottom:14px;">Når den er slået fra, skjules alt om mad og kalorier – kun træning, vægt og mål vises. Din tidligere data gemmes stadig og dukker frem igen, når du slår den til.</div>
+    <div id="nd-food-focus-history" style="margin-bottom:20px;"></div>
+
+    <button class="btn ghost" id="nd-help-btn" style="margin-top:8px;">Sådan virker appen</button>
   </div>
 
   <div class="nav">
@@ -1201,41 +1202,109 @@
     renderWeekGoalsScreen();
   });
 
+  function mondayFromWeekKey(wkey){
+    const [yearStr, wStr] = wkey.split('-W');
+    const year = parseInt(yearStr, 10), week = parseInt(wStr, 10);
+    const jan4 = new Date(year, 0, 4);
+    const jan4Day = (jan4.getDay() + 6) % 7;
+    const week1Monday = new Date(jan4); week1Monday.setDate(jan4.getDate() - jan4Day);
+    const monday = new Date(week1Monday); monday.setDate(week1Monday.getDate() + (week-1)*7);
+    return monday;
+  }
+  function quarterInfoForWeekKey(wkey){
+    const monday = mondayFromWeekKey(wkey);
+    const q = Math.floor(monday.getMonth()/3) + 1;
+    return { label: `Q${q} ${monday.getFullYear()}`, sortKey: `${monday.getFullYear()}-Q${q}`, monday };
+  }
+  async function computeWeekRow(wkey, goalsMap){
+    const goals = goalsMap[wkey] || [];
+    const info = { year: parseInt(wkey.split('-W')[0],10), week: parseInt(wkey.split('-W')[1],10) };
+    if (goals.length === 0) return { wkey, info, none: true, monday: mondayFromWeekKey(wkey) };
+    const monday = mondayFromWeekKey(wkey);
+    const dates = isoWeekDates(monday);
+    const exMap = await getExerciseForDates(dates);
+    const weekEntries = dates.reduce((a,d) => a.concat(exMap[d] || []), []);
+    const metCount = goals.filter(g => computeGoalStatus(g, weekEntries).done).length;
+    return { wkey, info, metCount, total: goals.length, monday };
+  }
+  function weekRowHtml(r){
+    const sat = weekSat[r.wkey];
+    const satMark = sat && sat.satisfied === 'yes' ? '<span style="color:var(--sage); margin-left:6px;">&check;</span>' : sat && sat.satisfied === 'no' ? '<span style="color:var(--coral); margin-left:6px;">&times;</span>' : '';
+    if (r.none) {
+      return `<div class="wd">Uge ${r.info.week}, ${r.info.year}</div><div class="wv" style="color:var(--text-lo); font-size:12px;">Ingen mål${satMark}</div>`;
+    }
+    const allMet = r.metCount === r.total;
+    return `<div class="wd">Uge ${r.info.week}, ${r.info.year}</div><div class="wv" style="color:${allMet?'var(--sage)':'var(--text-mid)'}; font-size:13px;">${r.metCount}/${r.total} mål${satMark}</div>`;
+  }
+
   async function renderWeekGoalsHistory(){
     const el = document.getElementById('nd-week-history');
     if (!el) return;
     el.innerHTML = '<div class="hint">Henter historik...</div>';
-    const weekAnchors = [];
+
+    const allGoalsMap = await gatherAllWeekGoals();
+    const allWeekKeys = new Set(Object.keys(allGoalsMap));
+    Object.keys(weekSat).forEach(k => allWeekKeys.add(k));
+
+    const recentAnchors = [];
     for (let i = 0; i < 12; i++) {
       const d = new Date(); d.setDate(d.getDate() - 7*i);
-      weekAnchors.unshift(d);
+      recentAnchors.unshift(d);
     }
-    const rows = await Promise.all(weekAnchors.map(async (wd) => {
-      const info = isoWeekInfo(wd);
-      const wkey = isoWeekKeyFor(wd);
-      let goals = [];
-      try { const r = await window.storage.get(weekGoalsKey(wkey), false); goals = (r && r.value) ? JSON.parse(r.value) : []; } catch(e) { goals = []; }
-      if (goals.length === 0) return { wd, wkey, info, none: true };
-      const dates = isoWeekDates(wd);
-      const exMap = await getExerciseForDates(dates);
-      const weekEntries = dates.reduce((a,d) => a.concat(exMap[d] || []), []);
-      const metCount = goals.filter(g => computeGoalStatus(g, weekEntries).done).length;
-      return { wd, wkey, info, metCount, total: goals.length };
-    }));
+    const recentKeys = new Set(recentAnchors.map(d => isoWeekKeyFor(d)));
+
+    const recentRows = await Promise.all(recentAnchors.map(d => computeWeekRow(isoWeekKeyFor(d), allGoalsMap)));
+
+    const olderKeys = Array.from(allWeekKeys).filter(k => !recentKeys.has(k));
+    const quarterMap = {};
+    olderKeys.forEach(wkey => {
+      const { label, sortKey } = quarterInfoForWeekKey(wkey);
+      if (!quarterMap[sortKey]) quarterMap[sortKey] = { label, weeks: [] };
+      quarterMap[sortKey].weeks.push(wkey);
+    });
+    const quarterSortKeys = Object.keys(quarterMap).sort().reverse();
+
     el.innerHTML = '';
-    rows.slice().reverse().forEach(r => {
+    recentRows.slice().reverse().forEach(r => {
       const row = document.createElement('div');
       row.className = 'weightrow';
-      const sat = weekSat[r.wkey];
-      const satMark = sat && sat.satisfied === 'yes' ? '<span style="color:var(--sage); margin-left:6px;">&check;</span>' : sat && sat.satisfied === 'no' ? '<span style="color:var(--coral); margin-left:6px;">&times;</span>' : '';
-      if (r.none) {
-        row.innerHTML = `<div class="wd">Uge ${r.info.week}, ${r.info.year}</div><div class="wv" style="color:var(--text-lo); font-size:12px;">Ingen mål${satMark}</div>`;
-      } else {
-        const allMet = r.metCount === r.total;
-        row.innerHTML = `<div class="wd">Uge ${r.info.week}, ${r.info.year}</div><div class="wv" style="color:${allMet?'var(--sage)':'var(--text-mid)'}; font-size:13px;">${r.metCount}/${r.total} mål${satMark}</div>`;
-      }
-      row.addEventListener('click', () => goToWeek(r.wd));
+      row.innerHTML = weekRowHtml(r);
+      row.addEventListener('click', () => goToWeek(r.monday || r.wd));
       el.appendChild(row);
+    });
+
+    quarterSortKeys.forEach(qk => {
+      const q = quarterMap[qk];
+      const weeksWithGoals = q.weeks.filter(wk => (allGoalsMap[wk]||[]).length > 0).length;
+      const header = document.createElement('div');
+      header.className = 'weightrow';
+      header.style.cursor = 'pointer';
+      header.innerHTML = `<div class="wd">${q.label}</div><div class="wv" style="font-size:12px; color:var(--text-mid);">${weeksWithGoals} ${weeksWithGoals===1?'uge':'uger'} med mål &rsaquo;</div>`;
+      const body = document.createElement('div');
+      body.style.display = 'none';
+      body.style.marginBottom = '6px';
+      let loaded = false;
+      header.addEventListener('click', async () => {
+        const isOpen = body.style.display === 'block';
+        if (isOpen) { body.style.display = 'none'; return; }
+        body.style.display = 'block';
+        if (loaded) return;
+        loaded = true;
+        body.innerHTML = '<div class="hint">Henter...</div>';
+        const sortedWeeks = q.weeks.slice().sort().reverse();
+        const rows = await Promise.all(sortedWeeks.map(wk => computeWeekRow(wk, allGoalsMap)));
+        body.innerHTML = '';
+        rows.forEach(r => {
+          const row = document.createElement('div');
+          row.className = 'weightrow';
+          row.style.marginLeft = '10px';
+          row.innerHTML = weekRowHtml(r);
+          row.addEventListener('click', (ev) => { ev.stopPropagation(); goToWeek(r.monday); });
+          body.appendChild(row);
+        });
+      });
+      el.appendChild(header);
+      el.appendChild(body);
     });
   }
 
@@ -1934,7 +2003,7 @@
     });
   }
 
-  let currentRange = '7';
+  let currentRange = 'thisweek';
   document.getElementById('nd-ov-range').addEventListener('change', (e) => {
     currentRange = e.target.value;
     renderOverview(currentRange);
@@ -1951,6 +2020,8 @@
         const exDates = Object.keys(em).filter(d => em[d] && em[d].length > 0).sort();
         if (exDates.length === 0) { body.innerHTML = '<div class="empty">Ingen træning logget endnu.</div>'; return; }
         sd = new Date(exDates[0] + 'T00:00:00');
+      } else if (rangeVal === 'thisweek') {
+        sd = isoWeekStart(new Date());
       } else {
         sd = new Date(); sd.setDate(sd.getDate() - (Number(rangeVal) - 1));
       }
@@ -1988,6 +2059,8 @@
         return;
       }
       startDate = new Date(loggedDates[0] + 'T00:00:00');
+    } else if (rangeVal === 'thisweek') {
+      startDate = isoWeekStart(new Date());
     } else {
       const days = Number(rangeVal);
       startDate = new Date();
