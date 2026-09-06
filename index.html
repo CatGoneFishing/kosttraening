@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Hold Formen</title>
-<meta name="description" content="Personlig kost-, vægt- og træningsdagbog">
+<meta name="description" content="Personlig trænings-, vægt- og kostdagbog">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#16231C">
 <meta name="mobile-web-app-capable" content="yes">
@@ -453,7 +453,12 @@
     return 'night_snack';
   }
 
-  const isoDate = d => d.toISOString().slice(0,10);
+  const isoDate = d => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth()+1).padStart(2,'0');
+    const day = String(d.getDate()).padStart(2,'0');
+    return `${y}-${m}-${day}`;
+  };
   const diaryKey = dateStr => 'nd_diary_' + dateStr;
   const exerciseKey = dateStr => 'nd_exercise_' + dateStr;
   const weekGoalsKey = weekStr => 'nd_weekgoals_' + weekStr;
@@ -2033,11 +2038,7 @@
       const exAgg2 = aggregateExercise(exMap2, ds);
       const exerciseHtml2 = exAgg2.length ? `
         <div class="section-lbl"><span>Træning i perioden</span></div>
-        ${exAgg2.map(a => `
-          <div class="entry" style="cursor:default;">
-            <div><div class="name">${escapeHtml(a.activity)}</div><div class="sub">${a.count} ${a.count===1?'gang':'gange'}${a.minutes ? ' · '+a.minutes+' min' : ''}${a.distanceLabel ? ' · '+a.distanceLabel : ''}</div></div>
-          </div>
-        `).join('')}
+        ${exAgg2.map(a => trainingSummaryRowHtml(a)).join('')}
       ` : '<div class="empty">Ingen træning logget i denne periode.</div>';
       body.innerHTML = `
         <div class="statgrid">
@@ -2045,6 +2046,7 @@
         </div>
         ${exerciseHtml2}
       `;
+      wireTrainingSummaryExpand(body, exAgg2);
       return;
     }
 
@@ -2167,11 +2169,7 @@
 
     const exerciseHtml = exAgg.length ? `
       <div class="section-lbl" style="margin-top:22px;"><span>Træning i perioden</span></div>
-      ${exAgg.map(a => `
-        <div class="entry" style="cursor:default;">
-          <div><div class="name">${escapeHtml(a.activity)}</div><div class="sub">${a.count} ${a.count===1?'gang':'gange'}${a.minutes ? ' · '+a.minutes+' min' : ''}${a.distanceLabel ? ' · '+a.distanceLabel : ''}</div></div>
-        </div>
-      `).join('')}
+      ${exAgg.map(a => trainingSummaryRowHtml(a)).join('')}
     ` : '';
 
     body.innerHTML = `
@@ -2195,6 +2193,7 @@
       ${insightHtml}
       ${exerciseHtml}
     `;
+    wireTrainingSummaryExpand(body, exAgg);
   }
 
   function aggregateMealAverages(dayTotals, diaryMap){
@@ -2222,20 +2221,55 @@
     dates.forEach(dstr => {
       const list = exerciseMap[dstr] || [];
       list.forEach(e => {
-        if (!byActivity[e.activity]) byActivity[e.activity] = { count: 0, minutes: 0, distances: {} };
+        if (!byActivity[e.activity]) byActivity[e.activity] = { count: 0, minutes: 0, distances: {}, entries: [] };
         byActivity[e.activity].count += 1;
         if (e.duration_min) byActivity[e.activity].minutes += e.duration_min;
         if (e.distance_value) {
           const u = e.distance_unit || 'km';
           byActivity[e.activity].distances[u] = (byActivity[e.activity].distances[u] || 0) + e.distance_value;
         }
+        byActivity[e.activity].entries.push({ date: dstr, duration_min: e.duration_min, distance_value: e.distance_value, distance_unit: e.distance_unit, type: e.type });
       });
     });
     return Object.keys(byActivity).map(a => {
       const d = byActivity[a];
       const distanceLabel = Object.keys(d.distances).map(u => `${fmt(d.distances[u])} ${u}`).join(' + ');
-      return { activity: a, count: d.count, minutes: Math.round(d.minutes), distanceLabel };
+      const entries = d.entries.slice().sort((x,y) => x.date.localeCompare(y.date));
+      return { activity: a, count: d.count, minutes: Math.round(d.minutes), distanceLabel, entries };
     }).sort((a,b) => b.count - a.count);
+  }
+
+  function trainingSummaryRowHtml(a){
+    return `
+      <div class="entry ex-summary-row" style="cursor:pointer;" data-activity="${escapeHtml(a.activity)}">
+        <div><div class="name">${escapeHtml(a.activity)}</div><div class="sub">${a.count} ${a.count===1?'gang':'gange'}${a.minutes ? ' · '+a.minutes+' min' : ''}${a.distanceLabel ? ' · '+a.distanceLabel : ''}</div></div>
+        <div style="color:var(--text-lo); font-size:16px;">&rsaquo;</div>
+      </div>
+      <div class="ex-summary-detail" data-activity-detail="${escapeHtml(a.activity)}" style="display:none; margin:-4px 0 10px 4px;"></div>
+    `;
+  }
+  function wireTrainingSummaryExpand(container, agg){
+    container.querySelectorAll('.ex-summary-row').forEach(row => {
+      const activity = row.getAttribute('data-activity');
+      const detail = container.querySelector(`.ex-summary-detail[data-activity-detail="${CSS.escape(activity)}"]`);
+      if (!detail) return;
+      row.addEventListener('click', () => {
+        const isOpen = detail.style.display === 'block';
+        if (isOpen) { detail.style.display = 'none'; return; }
+        if (!detail.dataset.built) {
+          const found = agg.find(a => a.activity === activity);
+          const rows = (found ? found.entries : []).map(e => {
+            const dateLabel = new Date(e.date+'T00:00:00').toLocaleDateString('da-DK', { weekday:'short', day:'numeric', month:'short' });
+            const durLabel = formatDuration(e.duration_min) || '';
+            const distLabel = e.distance_value ? `${fmt(e.distance_value)} ${e.distance_unit}` : '';
+            return `<div class="weightrow" style="cursor:default;"><div class="wd">${dateLabel}${e.type ? ' &middot; '+escapeHtml(e.type) : ''}</div><div class="wv" style="font-size:12px; color:var(--text-mid);">${[durLabel,distLabel].filter(Boolean).join(' &middot; ') || '&mdash;'}</div></div>`;
+          }).join('');
+          detail.innerHTML = rows;
+          detail.dataset.built = '1';
+        }
+        detail.style.display = 'block';
+      });
+    });
   }
 
   function computeTagInsights(dayTotals){
