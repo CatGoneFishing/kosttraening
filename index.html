@@ -1072,45 +1072,67 @@
   function openExerciseModal(existing){
     const isEdit = !!existing;
     const html = `
-      <div class="mhead"><div class="mtitle fr">${isEdit ? 'Rediger træning' : 'Tilføj træning'}</div><button class="mclose" id="nd-ex-close">&times;</button></div>
-      <div id="nd-ex-chips" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px;"></div>
-      <div style="display:flex; gap:8px; margin-bottom:8px;">
-        <input type="text" id="nd-ex-newcat" placeholder="Tilføj ny kategori" style="flex:1; margin-bottom:0;">
-        <button class="btn ghost" id="nd-ex-newcat-add" style="width:auto; padding:0 14px;">Tilføj</button>
+      <div class="mhead"><div class="mtitle fr" id="nd-ex-title">${isEdit ? 'Rediger træning' : 'Tilføj træning'}</div><button class="mclose" id="nd-ex-close">&times;</button></div>
+
+      <div id="nd-ex-form-view">
+        <div id="nd-ex-chips" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:8px;"></div>
+        <div style="text-align:right; margin: -2px 0 12px;">
+          <button id="nd-ex-manage-btn" style="background:none; border:none; color:var(--text-lo); font-size:12px; text-decoration:underline; cursor:pointer; padding:0;">Administrér kategorier</button>
+        </div>
+        <label class="fieldlbl">Aktivitet</label>
+        <input type="text" id="nd-ex-activity" placeholder="fx Løbetur i skoven">
+        <div id="nd-ex-type-wrap" style="display:none; margin-bottom:10px;">
+          <label class="fieldlbl">Type</label>
+          <select id="nd-ex-type">
+            <option value="">Vælg...</option>
+            <option value="Hold">Hold</option>
+            <option value="Selvtræning">Selvtræning</option>
+          </select>
+        </div>
+        <label class="fieldlbl">Varighed</label>
+        <div style="display:flex; gap:8px; align-items:center; margin-bottom:10px;">
+          <input type="number" id="nd-ex-duration-min" placeholder="min" min="0" style="flex:1; margin-bottom:0;">
+          <span style="color:var(--text-lo);">:</span>
+          <input type="number" id="nd-ex-duration-sec" placeholder="sek" min="0" max="59" style="flex:1; margin-bottom:0;">
+        </div>
+        <label class="fieldlbl">Distance</label>
+        <div style="display:flex; gap:8px;">
+          <input type="number" id="nd-ex-distance" placeholder="fx 12" style="margin-bottom:0;">
+          <select id="nd-ex-unit" style="width:auto; flex:0 0 68px; margin-bottom:0;">
+            <option value="km">km</option>
+            <option value="m">m</option>
+          </select>
+        </div>
+        <div id="nd-ex-err" style="font-size:12px; color: var(--red); display:none; margin:8px 0;"></div>
+        <div class="btnrow">
+          ${isEdit ? '<button class="btn danger" id="nd-ex-del">Slet</button>' : ''}
+          <button class="btn" id="nd-ex-save">${isEdit ? 'Gem ændringer' : 'Tilføj'}</button>
+        </div>
       </div>
-      <div id="nd-ex-customcats" style="margin-bottom:12px;"></div>
-      <label class="fieldlbl">Aktivitet</label>
-      <input type="text" id="nd-ex-activity" placeholder="fx Løbetur i skoven">
-      <div id="nd-ex-type-wrap" style="display:none; margin-bottom:10px;">
-        <label class="fieldlbl">Type</label>
-        <select id="nd-ex-type">
-          <option value="">Vælg...</option>
-          <option value="Hold">Hold</option>
-          <option value="Selvtræning">Selvtræning</option>
-        </select>
-      </div>
-      <label class="fieldlbl">Varighed</label>
-      <div style="display:flex; gap:8px; align-items:center; margin-bottom:10px;">
-        <input type="number" id="nd-ex-duration-min" placeholder="min" min="0" style="flex:1; margin-bottom:0;">
-        <span style="color:var(--text-lo);">:</span>
-        <input type="number" id="nd-ex-duration-sec" placeholder="sek" min="0" max="59" style="flex:1; margin-bottom:0;">
-      </div>
-      <label class="fieldlbl">Distance</label>
-      <div style="display:flex; gap:8px;">
-        <input type="number" id="nd-ex-distance" placeholder="fx 12" style="margin-bottom:0;">
-        <select id="nd-ex-unit" style="width:auto; flex:0 0 68px; margin-bottom:0;">
-          <option value="km">km</option>
-          <option value="m">m</option>
-        </select>
-      </div>
-      <div id="nd-ex-err" style="font-size:12px; color: var(--red); display:none; margin:8px 0;"></div>
-      <div class="btnrow">
-        ${isEdit ? '<button class="btn danger" id="nd-ex-del">Slet</button>' : ''}
-        <button class="btn" id="nd-ex-save">${isEdit ? 'Gem ændringer' : 'Tilføj'}</button>
+
+      <div id="nd-ex-manage-view" style="display:none;">
+        <div style="display:flex; gap:8px; margin-bottom:14px;">
+          <input type="text" id="nd-ex-newcat" placeholder="Tilføj ny kategori" style="flex:1; margin-bottom:0;">
+          <button class="btn ghost" id="nd-ex-newcat-add" style="width:auto; padding:0 14px;">Tilføj</button>
+        </div>
+        <div id="nd-ex-customcats"></div>
+        <button class="btn ghost" id="nd-ex-manage-back" style="margin-top:6px;">&lsaquo; Tilbage</button>
       </div>
     `;
     openModal(html);
     document.getElementById('nd-ex-close').addEventListener('click', closeModal);
+
+    document.getElementById('nd-ex-manage-btn').addEventListener('click', () => {
+      document.getElementById('nd-ex-form-view').style.display = 'none';
+      document.getElementById('nd-ex-manage-view').style.display = 'block';
+      document.getElementById('nd-ex-title').textContent = 'Administrér kategorier';
+      renderCustomCatList();
+    });
+    document.getElementById('nd-ex-manage-back').addEventListener('click', () => {
+      document.getElementById('nd-ex-manage-view').style.display = 'none';
+      document.getElementById('nd-ex-form-view').style.display = 'block';
+      document.getElementById('nd-ex-title').textContent = isEdit ? 'Rediger træning' : 'Tilføj træning';
+    });
 
     const isHulen = () => document.getElementById('nd-ex-activity').value.trim().toLowerCase() === 'hulen';
     const isSwimming = () => document.getElementById('nd-ex-activity').value.trim().toLowerCase() === 'svømning';
@@ -1149,41 +1171,39 @@
     function renderCustomCatList(){
       const wrap = document.getElementById('nd-ex-customcats');
       if (!wrap) return;
-      if (customActivities.length === 0) { wrap.innerHTML = ''; return; }
-      wrap.innerHTML = customActivities.map(a => `
-        <div class="entry" style="padding:9px 12px; margin-bottom:6px; cursor:default;">
-          <div class="name" style="font-size:13px;">${escapeHtml(a)}</div>
-          <div style="display:flex; gap:14px; align-items:center;">
-            <button class="cat-edit" data-cat="${escapeHtml(a)}" style="background:none; border:none; color:var(--text-mid); font-size:12px; cursor:pointer; padding:0;">Redigér</button>
-            <button class="cat-del" data-cat="${escapeHtml(a)}" style="background:none; border:none; color:var(--red); font-size:17px; cursor:pointer; padding:0;">&times;</button>
-          </div>
-        </div>
-      `).join('');
-      wrap.querySelectorAll('.cat-del').forEach(btn => btn.addEventListener('click', async () => {
-        const name = btn.dataset.cat;
-        if (!confirm(`Slet kategorien "${name}"? Tidligere logninger beholder navnet, men den forsvinder som genvej.`)) return;
-        customActivities = customActivities.filter(x => x !== name);
-        await saveCustomActivities();
-        renderCustomCatList();
-        renderExChips();
-        renderExSearchChips();
-      }));
-      wrap.querySelectorAll('.cat-edit').forEach(btn => btn.addEventListener('click', async () => {
-        const oldName = btn.dataset.cat;
-        const input = prompt('Ret navn:', oldName);
-        if (input === null) return;
-        const newName = input.trim();
-        if (!newName || newName === oldName) return;
-        if (activitiesList().some(x => x.toLowerCase() === newName.toLowerCase() && x.toLowerCase() !== oldName.toLowerCase())) {
-          alert('Der findes allerede en kategori med det navn.');
-          return;
-        }
-        await renameActivity(oldName, newName);
-        renderCustomCatList();
-        renderExChips();
-        renderExSearchChips();
-        if (document.getElementById('nd-ex-activity').value === oldName) document.getElementById('nd-ex-activity').value = newName;
-      }));
+      if (customActivities.length === 0) { wrap.innerHTML = '<div class="empty">Ingen egne kategorier endnu.</div>'; return; }
+      wrap.innerHTML = '';
+      customActivities.forEach(a => {
+        const row = document.createElement('div');
+        row.className = 'entry';
+        row.innerHTML = `<div class="name">${escapeHtml(a)}</div><button class="del">&times;</button>`;
+        row.addEventListener('click', async (ev) => {
+          if (ev.target.classList.contains('del')) return;
+          const input = prompt('Ret navn:', a);
+          if (input === null) return;
+          const newName = input.trim();
+          if (!newName || newName === a) return;
+          if (activitiesList().some(x => x.toLowerCase() === newName.toLowerCase() && x.toLowerCase() !== a.toLowerCase())) {
+            alert('Der findes allerede en kategori med det navn.');
+            return;
+          }
+          await renameActivity(a, newName);
+          renderCustomCatList();
+          renderExChips();
+          renderExSearchChips();
+          if (document.getElementById('nd-ex-activity').value === a) document.getElementById('nd-ex-activity').value = newName;
+        });
+        row.querySelector('.del').addEventListener('click', async (ev) => {
+          ev.stopPropagation();
+          if (!confirm(`Slet kategorien "${a}"? Tidligere logninger beholder navnet, men den forsvinder som genvej.`)) return;
+          customActivities = customActivities.filter(x => x !== a);
+          await saveCustomActivities();
+          renderCustomCatList();
+          renderExChips();
+          renderExSearchChips();
+        });
+        wrap.appendChild(row);
+      });
     }
     renderExChips();
     renderCustomCatList();
