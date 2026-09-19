@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Hold Formen</title>
-<meta name="description" content="Personlig trænings-, vægt- og kostdagbog">
+<meta name="description" content="Personlig træningslog med valgfri kost- og vægtsporing">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#16231C">
 <meta name="mobile-web-app-capable" content="yes">
@@ -86,11 +86,12 @@
     overflow: hidden;
     position: relative;
     min-height: 100vh;
+    padding-top: env(safe-area-inset-top, 0px);
   }
   #nd-app .fr { font-family: 'Fraunces', serif; }
   #nd-app .mono { font-family: 'IBM Plex Mono', monospace; }
 
-  #nd-app .screen { display: none; padding: 20px 18px 90px; }
+  #nd-app .screen { display: none; padding: 20px 18px calc(90px + env(safe-area-inset-bottom, 0px)); }
   #nd-app .screen.active { display: block; }
 
   #nd-app .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; gap: 10px; }
@@ -122,10 +123,10 @@
   #nd-app .empty { text-align: center; color: var(--text-lo); font-size: 13px; padding: 30px 10px; }
 
   #nd-app .fab-bar { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 420px; height: 0; pointer-events: none; z-index: 5; }
-  #nd-app .fab { position: absolute; right: 18px; bottom: 84px; width: 54px; height: 54px; border-radius: 50%; background: var(--lime); color: var(--ink); border: none; font-size: 26px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; pointer-events: auto; }
+  #nd-app .fab { position: absolute; right: 18px; bottom: calc(84px + env(safe-area-inset-bottom, 0px)); width: 54px; height: 54px; border-radius: 50%; background: var(--lime); color: var(--ink); border: none; font-size: 26px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; pointer-events: auto; }
   #nd-app .fab-left { right: auto; left: 18px; background: var(--sage); }
 
-  #nd-app .nav { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 420px; display: flex; background: var(--surface); border-top: 1px solid var(--line); padding: 9px 0 11px; z-index: 6; }
+  #nd-app .nav { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 420px; display: flex; background: var(--surface); border-top: 1px solid var(--line); padding: 9px 0 calc(11px + env(safe-area-inset-bottom, 0px)); z-index: 6; }
   #nd-app .nav button { flex: 1; background: none; border: none; color: var(--text-lo); font-size: 10.5px; font-family: 'Inter'; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 0 2px; }
   #nd-app .nav button.active { color: var(--lime); }
   #nd-app .nav .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: 0; }
@@ -412,6 +413,7 @@
   const KEY_WEIGHTS = 'nd_weights';
   const KEY_WEIGHT_GOAL = 'nd_weight_goal';
   const KEY_SKIPDAYS = 'nd_skipdays';
+  const KEY_CUSTOM_ACTIVITIES = 'nd_custom_activities';
   const KEY_RECENT = 'nd_recent_foods';
   const KEY_COMBOS = 'nd_combos';
   const KEY_LAST_EXPORT = 'nd_last_export';
@@ -424,6 +426,15 @@
   const KEY_CUSTOM_TAGS = 'nd_custom_tags';
   const DEFAULT_TAGS = ['Ferie', 'Rejse', 'Fødselsdag', 'Arbejdsmiddag', 'Fest', 'Menstruation', 'Sygdom', 'Restaurant', 'Alkohol'];
   const EXERCISE_ACTIVITIES = ['Løb', 'Cykling', 'Svømning', 'Romaskine', 'Styrketræning', 'Hulen', 'Yoga'];
+  function activitiesList(){
+    const seen = new Set();
+    const out = [];
+    EXERCISE_ACTIVITIES.concat(customActivities).forEach(a => {
+      const key = a.trim().toLowerCase();
+      if (!seen.has(key)) { seen.add(key); out.push(a); }
+    });
+    return out;
+  }
   const WEEK_GOAL_METRICS = [
     { id: 'minutes', label: 'Minutter' },
     { id: 'km', label: 'Kilometer' },
@@ -499,6 +510,7 @@
   let weights = {};
   let weightGoal = null;
   let skipDays = {};
+  let customActivities = [];
   let recentFoods = [];
   let combos = [];
   let lastExportAt = null;
@@ -601,6 +613,20 @@
     catch(e) { skipDays = {}; }
   }
   async function saveSkipDays(){ await window.storage.set(KEY_SKIPDAYS, JSON.stringify(skipDays), false); }
+
+  async function loadCustomActivities(){
+    try { const r = await window.storage.get(KEY_CUSTOM_ACTIVITIES, false); customActivities = (r && r.value) ? JSON.parse(r.value) : []; }
+    catch(e) { customActivities = []; }
+  }
+  async function saveCustomActivities(){ await window.storage.set(KEY_CUSTOM_ACTIVITIES, JSON.stringify(customActivities), false); }
+  async function addCustomActivity(name){
+    name = name.trim();
+    if (!name) return false;
+    if (activitiesList().some(a => a.trim().toLowerCase() === name.toLowerCase())) return false;
+    customActivities.push(name);
+    await saveCustomActivities();
+    return true;
+  }
 
   async function loadRecentFoods(){
     try { const r = await window.storage.get(KEY_RECENT, false); recentFoods = (r && r.value) ? JSON.parse(r.value) : []; }
@@ -1012,7 +1038,11 @@
     const isEdit = !!existing;
     const html = `
       <div class="mhead"><div class="mtitle fr">${isEdit ? 'Rediger træning' : 'Tilføj træning'}</div><button class="mclose" id="nd-ex-close">&times;</button></div>
-      <div id="nd-ex-chips" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px;"></div>
+      <div id="nd-ex-chips" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px;"></div>
+      <div style="display:flex; gap:8px; margin-bottom:12px;">
+        <input type="text" id="nd-ex-newcat" placeholder="Tilføj ny kategori" style="flex:1; margin-bottom:0;">
+        <button class="btn ghost" id="nd-ex-newcat-add" style="width:auto; padding:0 14px;">Tilføj</button>
+      </div>
       <label class="fieldlbl">Aktivitet</label>
       <input type="text" id="nd-ex-activity" placeholder="fx Løbetur i skoven">
       <div id="nd-ex-type-wrap" style="display:none; margin-bottom:10px;">
@@ -1065,17 +1095,35 @@
     });
 
     const chipsWrap = document.getElementById('nd-ex-chips');
-    EXERCISE_ACTIVITIES.forEach(a => {
-      const btn = document.createElement('button');
-      btn.className = 'chip';
-      btn.type = 'button';
-      btn.textContent = a;
-      btn.addEventListener('click', () => {
-        document.getElementById('nd-ex-activity').value = a;
-        syncTypeVisibility();
-        if (a.toLowerCase() === 'svømning') document.getElementById('nd-ex-unit').value = 'm';
+    function renderExChips(){
+      chipsWrap.innerHTML = '';
+      activitiesList().forEach(a => {
+        const btn = document.createElement('button');
+        btn.className = 'chip';
+        btn.type = 'button';
+        btn.textContent = a;
+        btn.addEventListener('click', () => {
+          document.getElementById('nd-ex-activity').value = a;
+          syncTypeVisibility();
+          if (a.toLowerCase() === 'svømning') document.getElementById('nd-ex-unit').value = 'm';
+        });
+        chipsWrap.appendChild(btn);
       });
-      chipsWrap.appendChild(btn);
+    }
+    renderExChips();
+    document.getElementById('nd-ex-newcat-add').addEventListener('click', async () => {
+      const input = document.getElementById('nd-ex-newcat');
+      const name = input.value.trim();
+      if (!name) return;
+      const added = await addCustomActivity(name);
+      renderExChips();
+      document.getElementById('nd-ex-activity').value = name;
+      syncTypeVisibility();
+      input.value = '';
+      if (!added) { input.placeholder = 'Findes allerede – valgt ovenfor'; setTimeout(() => input.placeholder = 'Tilføj ny kategori', 1800); }
+    });
+    document.getElementById('nd-ex-newcat').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); document.getElementById('nd-ex-newcat-add').click(); }
     });
 
     if (isEdit) {
@@ -1403,7 +1451,7 @@
     });
 
     const chipsWrap = document.getElementById('nd-wg-chips');
-    EXERCISE_ACTIVITIES.forEach(a => {
+    activitiesList().forEach(a => {
       const btn = document.createElement('button');
       btn.className = 'chip';
       btn.type = 'button';
@@ -2564,21 +2612,24 @@
   const DISTANCE_FOCUS_ACTIVITIES = ['svømning'];
   const TIME_FOCUS_ACTIVITIES = ['romaskine', 'løb', 'cykling'];
   const exSearchChipsWrap = document.getElementById('nd-ex-search-chips');
-  EXERCISE_ACTIVITIES.forEach(a => {
-    const btn = document.createElement('button');
-    btn.className = 'chip';
-    btn.type = 'button';
-    btn.textContent = a;
-    btn.addEventListener('click', () => {
-      document.getElementById('nd-ex-search-input').value = a;
-      const al = a.toLowerCase();
-      if (DISTANCE_FOCUS_ACTIVITIES.includes(al)) setActiveSortMode('longest');
-      else if (TIME_FOCUS_ACTIVITIES.includes(al)) setActiveSortMode('fastest');
-      else setActiveSortMode('newest');
-      renderExerciseSearch();
+  function renderExSearchChips(){
+    exSearchChipsWrap.innerHTML = '';
+    activitiesList().forEach(a => {
+      const btn = document.createElement('button');
+      btn.className = 'chip';
+      btn.type = 'button';
+      btn.textContent = a;
+      btn.addEventListener('click', () => {
+        document.getElementById('nd-ex-search-input').value = a;
+        const al = a.toLowerCase();
+        if (DISTANCE_FOCUS_ACTIVITIES.includes(al)) setActiveSortMode('longest');
+        else if (TIME_FOCUS_ACTIVITIES.includes(al)) setActiveSortMode('fastest');
+        else setActiveSortMode('newest');
+        renderExerciseSearch();
+      });
+      exSearchChipsWrap.appendChild(btn);
     });
-    exSearchChipsWrap.appendChild(btn);
-  });
+  }
   document.getElementById('nd-ex-search-input').addEventListener('input', () => {
     clearTimeout(exSearchDebounce);
     exSearchDebounce = setTimeout(renderExerciseSearch, 350);
@@ -2629,7 +2680,7 @@
       app: 'naeringsdagbog',
       version: 1,
       exportedAt: new Date().toISOString(),
-      goals, favorites, weights, weightGoal, goalHistory, notes, customTags, diary, exercise, weekGoals: weekGoalsAll, skipDays, recentFoods, combos, weekSat, foodFocusHistory
+      goals, favorites, weights, weightGoal, goalHistory, notes, customTags, diary, exercise, weekGoals: weekGoalsAll, skipDays, recentFoods, combos, weekSat, foodFocusHistory, customActivities
     };
     const json = JSON.stringify(payload, null, 2);
     const filename = `hold-formen-backup-${todayIso()}.json`;
@@ -2731,6 +2782,9 @@
         data.foodFocusHistory.forEach(h => { if (h && h.timestamp && !existingTs.has(h.timestamp)) foodFocusHistory.push(h); });
         foodFocusHistory.sort((a,b) => a.timestamp.localeCompare(b.timestamp));
       }
+      if (Array.isArray(data.customActivities)) {
+        data.customActivities.forEach(a => { if (!activitiesList().some(x => x.toLowerCase() === String(a).toLowerCase())) customActivities.push(a); });
+      }
       if (Array.isArray(data.customTags)) {
         data.customTags.forEach(t => { if (!customTags.some(x => x.toLowerCase() === String(t).toLowerCase())) customTags.push(t); });
       }
@@ -2801,20 +2855,21 @@
           else { await window.storage.set(weekGoalsKey(weekStr), JSON.stringify(merged), false); }
         }
       }
-      await Promise.all([saveGoals(), saveFavorites(), saveWeights(), saveGoalHistory(), saveNotes(), saveCustomTags(), saveWeightGoal(), saveSkipDays(), saveRecentFoods(), saveCombos(), saveWeekSat(), saveFoodFocusHistory()]);
+      await Promise.all([saveGoals(), saveFavorites(), saveWeights(), saveGoalHistory(), saveNotes(), saveCustomTags(), saveWeightGoal(), saveSkipDays(), saveRecentFoods(), saveCombos(), saveWeekSat(), saveFoodFocusHistory(), saveCustomActivities()]);
       renderToday();
       renderGoalsForm();
       renderGoalHistory();
       renderFoodFocusHistory();
       renderWeekGoalsScreen();
       renderBackupReminder();
+      renderExSearchChips();
       closeModal();
     });
   });
 
   (async function init(){
     document.getElementById('nd-day-picker').max = todayIso();
-    await Promise.all([loadGoals(), loadEntries(), loadFavorites(), loadWeights(), loadGoalHistory(), loadNotes(), loadCustomTags(), loadWeightGoal(), loadExercise(), loadWeekGoals(), loadSkipDays(), loadRecentFoods(), loadCombos(), loadLastExport(), loadWeekSat(), loadFoodFocus(), loadFoodFocusHistory()]);
+    await Promise.all([loadGoals(), loadEntries(), loadFavorites(), loadWeights(), loadGoalHistory(), loadNotes(), loadCustomTags(), loadWeightGoal(), loadExercise(), loadWeekGoals(), loadSkipDays(), loadRecentFoods(), loadCombos(), loadLastExport(), loadWeekSat(), loadFoodFocus(), loadFoodFocusHistory(), loadCustomActivities()]);
     applyFoodFocusVisibility();
     renderToday();
     renderGoalsForm();
@@ -2822,6 +2877,7 @@
     renderFoodFocusHistory();
     renderBackupReminder();
     checkLoggingGap();
+    renderExSearchChips();
   })();
 })();
 </script>
